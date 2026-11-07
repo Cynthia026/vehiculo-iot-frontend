@@ -1,6 +1,6 @@
 // js/api.js
-import { CONFIG } from './config.js';
-import { ui } from './ui.js';
+import { CONFIG } from './config.js?v=2';
+import { ui } from './ui.js?v=2';
 
 class ApiClient {
     constructor() {
@@ -78,3 +78,4 @@ class ApiClient {
 
 // EXPORTACIÓN EXACTA: app.js espera 'api'
 export const api = new ApiClient();
+export const API = api;

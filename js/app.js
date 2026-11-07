@@ -1,8 +1,8 @@
 // js/app.js
-import { api } from './api.js';
-import { wsManager } from './websocket.js';
-import { ui } from './ui.js';
-import { Joystick } from './joystick.js';
+import { api } from './api.js?v=2';
+import { wsManager } from './websocket.js?v=2';
+import { ui } from './ui.js?v=2';
+import { Joystick } from './joystick.js?v=2';
 
 let catalogoComandos = [];
 let idComandoDetener = null;
@@ -17,8 +17,11 @@ async function inicializar() {
         catalogoComandos = await api.obtenerComandos();
         const demos = await api.obtenerDemos();
 
-        // Buscar el ID del comando Detener (Sensible a mayúsculas/minúsculas)
-        const cmdDetener = catalogoComandos.find(c => c.nombre === 'Detener');
+        // Buscar el ID del comando Detener
+        const cmdDetener = catalogoComandos.find(c => {
+            const nombre = (c.nombre || c.comando || '').toUpperCase();
+            return nombre === 'DETENER' || nombre === 'STOP';
+        });
         if (cmdDetener) idComandoDetener = cmdDetener.id_comando;
 
         // 3. Renderizar UI Dinámica
@@ -63,10 +66,13 @@ async function manejarMovimientoJoystick(direccion) {
     };
     
     const nombreApi = mapDirecciones[direccion];
-    const comando = catalogoComandos.find(c => c.nombre === nombreApi);
+    const comando = catalogoComandos.find(c => {
+        const nombre = (c.nombre || c.comando || '').toUpperCase();
+        return nombre === nombreApi || nombre === direccion;
+    });
     
     if (comando) {
-        ejecutarComando(comando.id_comando, comando.nombre);
+        ejecutarComando(comando.id_comando, comando.nombre || comando.comando);
     }
 }
 
