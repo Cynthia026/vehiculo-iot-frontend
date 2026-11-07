@@ -1,128 +1,91 @@
 // js/app.js
-import { CONFIG } from './config.js';
-import { UI } from './ui.js';
-import { API } from './api.js';
-import { JoystickControl } from './joystick.js';
+import { api } from './api.js';
+import { wsManager } from './websocket.js';
+import { ui } from './ui.js';
+import { Joystick } from './joystick.js';
 
-// Convertir las funciones a globales solo si queremos llamarlas desde un 'onclick' en el HTML generado dinámicamente
-window.ejecutarMovimiento = async function(nombreComando) {
-    const idComando = API.commandsMap[nombreComando];
-    if (!idComando) return;
+let catalogoComandos = [];
+let idComandoDetener = null;
+
+async function inicializar() {
     try {
-        UI.showFeedback(`<i class="bi bi-send"></i> Comando: <b>${nombreComando}</b>`);
-        await API.postMovimiento(idComando);
-    } catch (error) {
-        UI.showFeedback(`Error enviando ${nombreComando}`, 'danger');
-    }
-};
+        // 1. Iniciar WebSocket
+        wsManager.connect();
 
-window.ejecutarDetener = async function() {
-    const stopId = API.commandsMap['DETENER'] || API.commandsMap['STOP'];
-    if (stopId) {
-        try {
-            UI.showFeedback(`<i class="bi bi-sign-stop-fill text-danger"></i> <b>VEHÍCULO DETENIDO</b>`);
-            await API.postMovimiento(stopId);
-        } catch (e) {
-            UI.showFeedback('Error al detener', 'danger');
-        }
-    }
-};
+        // 2. Cargar Catálogos
+        ui.updateAwsStatus('Comprobando...');
+        catalogoComandos = await api.obtenerComandos();
+        const demos = await api.obtenerDemos();
 
-async function cargarCatalogos() {
-    try {
-        const comandos = await API.get(`/api/comandos/vehiculo/${CONFIG.VEHICULO_ID}`);
-        UI.cmdsContainer.innerHTML = ''; 
-        UI.btnStop.disabled = false;
+        // Buscar el ID del comando Detener (Sensible a mayúsculas/minúsculas)
+        const cmdDetener = catalogoComandos.find(c => c.nombre === 'Detener');
+        if (cmdDetener) idComandoDetener = cmdDetener.id_comando;
+
+        // 3. Renderizar UI Dinámica
+        ui.renderComandos(catalogoComandos, ejecutarComando);
+        ui.renderDemos(demos);
+
+        // 4. Configurar Eventos Botones
+        document.getElementById('btn-stop').addEventListener('click', detenerVehiculo);
         
-        comandos.forEach(cmd => {
-            const nombre = cmd.comando.toUpperCase();
-            API.commandsMap[nombre] = cmd.id_comando;
-
-            const ignorados = ['ADELANTE', 'ATRAS', 'IZQUIERDA', 'DERECHA', 'DETENER', 'STOP'];
-            if (!ignorados.includes(nombre)) {
-                const btnDiv = document.createElement('div');
-                btnDiv.className = 'col-6';
-                btnDiv.innerHTML = `<button class="btn btn-outline-primary w-100 py-2 shadow-sm" onclick="window.ejecutarMovimiento('${nombre}')">${nombre}</button>`;
-                UI.cmdsContainer.appendChild(btnDiv);
+        document.getElementById('btn-demo-start').addEventListener('click', async () => {
+            const select = document.getElementById('demo-select');
+            if (select.value) {
+                ui.showFeedback('Iniciando DEMO...', 'success');
+                await api.ejecutarDemo(select.value);
             }
         });
 
-        if(UI.cmdsContainer.innerHTML === '') {
-            UI.cmdsContainer.innerHTML = '<div class="col-12 text-center text-muted small">Sin comandos adicionales</div>';
-        }
-
-        const demos = await API.get(`/api/demos/vehiculo/${CONFIG.VEHICULO_ID}`);
-        UI.demoSelect.innerHTML = '<option value="">Seleccione una secuencia...</option>';
-        demos.forEach(demo => {
-            UI.demoSelect.innerHTML += `<option value="${demo.id_demo}">${demo.nombre}</option>`;
+        document.getElementById('btn-demo-cancel').addEventListener('click', async () => {
+            ui.showFeedback('Cancelando DEMO...', 'warning');
+            await api.cancelarDemo();
         });
 
-        UI.demoSelect.addEventListener('change', (e) => {
-            UI.btnDemoStart.disabled = e.target.value === "";
-        });
+        // 5. Inicializar Joystick
+        new Joystick('joystick-zone', 'joystick-knob', manejarMovimientoJoystick, detenerVehiculo);
 
-        UI.showFeedback('<i class="bi bi-check2-circle"></i> AWS: Datos cargados correctamente.', 'success');
+        // Ocultar mensaje de error si todo cargó bien
+        document.getElementById('action-feedback').classList.add('d-none');
 
     } catch (error) {
-        UI.cmdsContainer.innerHTML = '<div class="col-12 text-center text-danger small">Fallo al cargar comandos AWS</div>';
-        UI.showFeedback('Error de conexión REST con AWS', 'danger', false);
+        console.error("Error inicializando la app:", error);
+        ui.showFeedback('Error de red al cargar datos', 'danger');
     }
 }
 
-function iniciarWebSocket() {
-    UI.updateWss('Conectando...', 'warning');
-    const ws = new WebSocket(CONFIG.WS_URL);
-
-    ws.onopen = () => UI.updateWss('En línea', 'success');
-    ws.onmessage = (event) => console.log("WebSocket Event:", JSON.parse(event.data));
-    ws.onclose = () => {
-        UI.updateWss('Desconectado', 'danger');
-        setTimeout(iniciarWebSocket, 4000); 
+async function manejarMovimientoJoystick(direccion) {
+    // Mapeamos la salida del joystick a los nombres reales de tu API
+    const mapDirecciones = {
+        'ADELANTE': 'AVANZAR',
+        'ATRAS': 'RETROCEDER',
+        'IZQUIERDA': 'GIRAR_IZQUIERDA',
+        'DERECHA': 'GIRAR_DERECHA'
     };
-    ws.onerror = () => ws.close(); 
+    
+    const nombreApi = mapDirecciones[direccion];
+    const comando = catalogoComandos.find(c => c.nombre === nombreApi);
+    
+    if (comando) {
+        ejecutarComando(comando.id_comando, comando.nombre);
+    }
 }
 
-function configurarEventosEstaticos() {
-    UI.btnStop.addEventListener('click', window.ejecutarDetener);
-
-    UI.btnDemoStart.addEventListener('click', async () => {
-        const idDemo = UI.demoSelect.value;
-        if (!idDemo) return;
-        
-        try {
-            UI.btnDemoStart.disabled = true;
-            UI.btnDemoCancel.disabled = false;
-            UI.showFeedback('<i class="bi bi-play-circle"></i> Ejecutando secuencia DEMO...', 'info', false);
-            
-            const response = await fetch(`${CONFIG.API_URL}/api/demos/${idDemo}/ejecutar`, { method: 'POST' });
-            if (!response.ok) throw new Error("Error en DEMO");
-            
-        } catch (e) {
-            UI.showFeedback('Fallo al iniciar DEMO', 'danger');
-            UI.btnDemoStart.disabled = false;
-            UI.btnDemoCancel.disabled = true;
-        }
-    });
-
-    UI.btnDemoCancel.addEventListener('click', async () => {
-        try {
-            UI.showFeedback('<i class="bi bi-x-circle"></i> Cancelando DEMO...', 'warning');
-            await fetch(`${CONFIG.API_URL}/api/demos/vehiculo/${CONFIG.VEHICULO_ID}/cancelar`, { method: 'POST' });
-            setTimeout(window.ejecutarDetener, 300);
-            
-        } catch (e) {
-            UI.showFeedback('Error al cancelar', 'danger');
-        } finally {
-            UI.btnDemoCancel.disabled = true;
-            UI.btnDemoStart.disabled = false;
-        }
-    });
+async function ejecutarComando(idComando, nombreComando) {
+    try {
+        ui.showFeedback(`Enviando: ${nombreComando}`);
+        await api.ejecutarMovimiento(idComando);
+    } catch (error) {
+        // El error ya lo maneja api.js
+    }
 }
 
-// Iniciar aplicación
-document.addEventListener('DOMContentLoaded', () => {
-    JoystickControl.init(window.ejecutarMovimiento, window.ejecutarDetener);
-    configurarEventosEstaticos();
-    cargarCatalogos();
-    iniciarWebSocket();
-});
+async function detenerVehiculo() {
+    if (idComandoDetener) {
+        ejecutarComando(idComandoDetener, 'Detener');
+    } else {
+        console.error("Comando 'Detener' no encontrado en el catálogo");
+    }
+}
+
+// Iniciar aplicación al cargar el DOM
+document.addEventListener('DOMContentLoaded', inicializar);
