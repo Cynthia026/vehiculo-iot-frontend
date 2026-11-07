@@ -1,5 +1,5 @@
 // js/app.js
-import { api } from './api.js?v=2';
+import { api } from './api.js?v=3';
 import { wsManager } from './websocket.js?v=2';
 import { ui } from './ui.js?v=2';
 import { Joystick } from './joystick.js?v=2';

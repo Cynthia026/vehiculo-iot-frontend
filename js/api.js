@@ -68,7 +68,18 @@ class ApiClient {
     }
 
     async ejecutarDemo(idDemo) {
-        return await fetch(`${CONFIG.API_BASE_URL}/api/demos/${idDemo}/ejecutar`, { method: 'POST' });
+        // Añadimos el id_vehiculo como query parameter (ej. ?id_vehiculo=1)
+        const url = `${CONFIG.API_BASE_URL}/api/demos/${idDemo}/ejecutar?id_vehiculo=${CONFIG.VEHICULO_ID}`;
+        
+        const response = await fetch(url, { 
+            method: 'POST',
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
     }
 
     async cancelarDemo() {
