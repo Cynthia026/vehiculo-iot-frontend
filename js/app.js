@@ -1,8 +1,9 @@
 // js/app.js
-import { api } from './api.js?v=3';
-import { wsManager } from './websocket.js?v=2';
-import { ui } from './ui.js?v=2';
-import { Joystick } from './joystick.js?v=2';
+import { api } from './api.js';
+import { wsManager } from './websocket.js';
+import { ui } from './ui.js';
+import { Joystick } from './joystick.js';
+import { CONFIG } from './config.js'; // Importado para acceder a la URL base
 
 let catalogoComandos = [];
 let idComandoDetener = null;
@@ -12,23 +13,23 @@ async function inicializar() {
         // 1. Iniciar WebSocket
         wsManager.connect();
 
-        // 2. Cargar Catálogos
+        // 2. Verificar estado de Amazon RDS (Nuevo Endpoint)
+        await verificarRDS();
+
+        // 3. Cargar Catálogos
         ui.updateAwsStatus('Comprobando...');
         catalogoComandos = await api.obtenerComandos();
         const demos = await api.obtenerDemos();
 
-        // Buscar el ID del comando Detener
-        const cmdDetener = catalogoComandos.find(c => {
-            const nombre = (c.nombre || c.comando || '').toUpperCase();
-            return nombre === 'DETENER' || nombre === 'STOP';
-        });
+        // Buscar el ID del comando Detener (Sensible a mayúsculas/minúsculas)
+        const cmdDetener = catalogoComandos.find(c => c.nombre === 'Detener');
         if (cmdDetener) idComandoDetener = cmdDetener.id_comando;
 
-        // 3. Renderizar UI Dinámica
+        // 4. Renderizar UI Dinámica
         ui.renderComandos(catalogoComandos, ejecutarComando);
         ui.renderDemos(demos);
 
-        // 4. Configurar Eventos Botones
+        // 5. Configurar Eventos Botones
         document.getElementById('btn-stop').addEventListener('click', detenerVehiculo);
         
         document.getElementById('btn-demo-start').addEventListener('click', async () => {
@@ -44,7 +45,7 @@ async function inicializar() {
             await api.cancelarDemo();
         });
 
-        // 5. Inicializar Joystick
+        // 6. Inicializar Joystick
         new Joystick('joystick-zone', 'joystick-knob', manejarMovimientoJoystick, detenerVehiculo);
 
         // Ocultar mensaje de error si todo cargó bien
@@ -56,8 +57,34 @@ async function inicializar() {
     }
 }
 
+// NUEVA FUNCIÓN: Consulta el endpoint de salud
+async function verificarRDS() {
+    const rdsBadge = document.getElementById('status-rds');
+    rdsBadge.innerHTML = `<i class="bi bi-arrow-repeat"></i> RDS: Consultando...`;
+    
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/api/health`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.rds === 'Disponible') {
+                rdsBadge.className = 'badge bg-success border border-light';
+                rdsBadge.innerHTML = `<i class="bi bi-database-check"></i> RDS: Disponible`;
+            } else {
+                rdsBadge.className = 'badge bg-danger border border-light';
+                rdsBadge.innerHTML = `<i class="bi bi-database-x"></i> RDS: No disponible`;
+            }
+        } else {
+            throw new Error("Respuesta no OK de /api/health");
+        }
+    } catch (error) {
+        console.error("Error al consultar RDS:", error);
+        rdsBadge.className = 'badge bg-secondary border border-light';
+        rdsBadge.innerHTML = `<i class="bi bi-database-dash"></i> RDS: Sin verificar`;
+    }
+}
+
 async function manejarMovimientoJoystick(direccion) {
-    // Mapeamos la salida del joystick a los nombres reales de tu API
+    // Mapeamos la salida del joystick a los nombres reales de la API
     const mapDirecciones = {
         'ADELANTE': 'AVANZAR',
         'ATRAS': 'RETROCEDER',
@@ -66,13 +93,10 @@ async function manejarMovimientoJoystick(direccion) {
     };
     
     const nombreApi = mapDirecciones[direccion];
-    const comando = catalogoComandos.find(c => {
-        const nombre = (c.nombre || c.comando || '').toUpperCase();
-        return nombre === nombreApi || nombre === direccion;
-    });
+    const comando = catalogoComandos.find(c => c.nombre === nombreApi);
     
     if (comando) {
-        ejecutarComando(comando.id_comando, comando.nombre || comando.comando);
+        ejecutarComando(comando.id_comando, comando.nombre);
     }
 }
 
