@@ -49,44 +49,33 @@
 
         <!-- Panel de conducción -->
         <section class="panel drive-panel" aria-label="Controles de conducción">
-            <div class="gamepad">
-                <span class="gp-grip gp-grip-l"></span><span class="gp-grip gp-grip-r"></span>
-                <span class="gp-bumper gp-bumper-l"></span><span class="gp-bumper gp-bumper-r"></span>
-                <div class="gp-body">
-                    <div class="gp-top">
-                        <span class="gp-led gp-led-a"></span>
-                        <img class="gp-logo" src="assets/Favicon_Iot_vehiculo.png" alt="">
-                        <span class="gp-led gp-led-b"></span>
-                    </div>
             <div class="pad-row">
                 <div class="pad">
                     <h2 class="pad-title">Movimiento</h2>
-                    <div class="gp-well"><div id="joystick-zone" class="joystick-zone" role="application" aria-label="Joystick de movimiento">
+                    <div id="joystick-zone" class="joystick-zone" role="application" aria-label="Joystick de movimiento">
                         <span class="jz-mark jz-up"><i class="bi bi-chevron-up"></i></span>
                             <span class="jz-mark jz-down"><i class="bi bi-chevron-down"></i></span>
                             <span class="jz-mark jz-left"><i class="bi bi-chevron-left"></i></span>
                             <span class="jz-mark jz-right"><i class="bi bi-chevron-right"></i></span>
                         <div id="joystick-knob" class="joystick-knob"><i class="bi bi-arrows-move"></i></div>
-                    </div></div>
+                    </div>
                     <p class="pad-hint">Avanzar · Retroceder · Girar</p>
                 </div>
                 <div class="pad">
                     <h2 class="pad-title">Brazo y motores</h2>
-                    <div class="gp-well"><div id="joystick-zone-arm" class="joystick-zone joystick-alt" role="application" aria-label="Joystick de brazo y motores">
+                    <div id="joystick-zone-arm" class="joystick-zone joystick-alt" role="application" aria-label="Joystick de brazo y motores">
                         <span class="jz-mark jz-up"><i class="bi bi-arrow-bar-up"></i></span>
                             <span class="jz-mark jz-down"><i class="bi bi-arrow-bar-down"></i></span>
                             <span class="jz-mark jz-left"><i class="bi bi-arrow-counterclockwise"></i></span>
                             <span class="jz-mark jz-right"><i class="bi bi-arrow-clockwise"></i></span>
                         <div id="joystick-knob-arm" class="joystick-knob"><i class="bi bi-gear-wide-connected"></i></div>
-                    </div></div>
+                    </div>
                     <p class="pad-hint">Brazo ↕ · Motores ↔</p>
                 </div>
             </div>
             <button id="btn-stop" class="btn-stop" disabled>
                 <i class="bi bi-sign-stop-fill"></i> Detener
             </button>
-                </div>
-            </div>
         </section>
 
         <!-- Comandos y secuencias -->
