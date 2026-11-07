@@ -14,7 +14,7 @@
     --danger: #ff5d6c;
     --info: #5cc8ff;
     --radius: 22px;
-    --joy: clamp(116px, calc((100vw - 6rem) / 2), 200px);
+    --joy: clamp(120px, calc((100vw - 4.2rem) / 2), 230px);
     --knob: calc(var(--joy) * .38);
     font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -87,7 +87,7 @@ body {
 .app-main {
     flex: 1;
     width: 100%;
-    max-width: 1080px;
+    max-width: 1440px;
     margin: 0 auto;
     padding: 1rem;
     display: flex;
@@ -149,15 +149,17 @@ body {
     width: var(--joy);
     height: var(--joy);
     border-radius: 50%;
+    border: calc(var(--joy) * .03) solid transparent;
     background:
-        linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)) center / 1px 58% no-repeat,
-        linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)) center / 58% 1px no-repeat,
-        radial-gradient(circle at 50% 38%, #26345a 0%, #141c33 70%);
+        radial-gradient(circle calc(var(--knob) * .74) at 50% 50%, rgba(0,0,0,.45) 0 90%, rgba(var(--jrgb), .4) 91% 95%, transparent 96%) padding-box,
+        linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)) center / 1px 60% no-repeat padding-box,
+        linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)) center / 60% 1px no-repeat padding-box,
+        radial-gradient(circle at 50% 36%, #2a3960 0%, #121a30 72%) padding-box,
+        conic-gradient(from 200deg, #4a5a86, #151c32 20%, #56668f 38%, #151c32 58%, #4a5a86 78%, #151c32 100%) border-box;
     box-shadow:
         inset 0 10px 26px rgba(0, 0, 0, .6),
-        0 0 0 1px rgba(255, 255, 255, .09),
-        0 0 0 7px rgba(var(--jrgb), .06),
-        0 18px 36px rgba(0, 0, 0, .45);
+        0 0 0 6px rgba(var(--jrgb), .05),
+        0 22px 44px rgba(0, 0, 0, .5);
     touch-action: none;
     cursor: grab;
 }
@@ -185,7 +187,7 @@ body {
 .joystick-zone[data-dir="ATRAS"]     { --wa: 135deg; }
 .joystick-zone[data-dir="IZQUIERDA"] { --wa: 225deg; }
 
-.jz-mark { position: absolute; z-index: 1; color: rgba(255, 255, 255, .3); font-size: 1rem; pointer-events: none; transform: translate(-50%, -50%); transition: color .12s; }
+.jz-mark { position: absolute; z-index: 1; color: rgba(255, 255, 255, .32); font-size: calc(var(--joy) * .085); pointer-events: none; transform: translate(-50%, -50%); transition: color .12s; }
 .jz-up    { top: 19%; left: 50%; }
 .jz-down  { top: 81%; left: 50%; }
 .jz-left  { top: 50%; left: 19%; }
@@ -221,8 +223,8 @@ body {
 /* ===== Botón detener ===== */
 .btn-stop {
     width: 100%;
-    max-width: 420px;
-    min-height: 62px;
+    max-width: 100%;
+    min-height: clamp(60px, 8vh, 80px);
     display: flex; align-items: center; justify-content: center; gap: .6rem;
     font-family: inherit; font-size: 1.1rem; font-weight: 700; letter-spacing: .02em;
     color: #fff;
@@ -238,32 +240,35 @@ body {
 .btn-stop i { font-size: 1.4rem; }
 
 /* ===== Accesorios (se llena desde ui.js) ===== */
-.commands-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: .65rem; margin: 0; }
+.side-column .panel { display: flex; flex-direction: column; }
+.side-column .panel:first-child { flex: 1; }
+.commands-grid { display: grid; flex: 1; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: .8rem; margin: 0; }
 .commands-grid .commands-loading { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: .85rem; padding: .6rem 0; }
 .cmd-btn {
     --c: 255, 180, 58;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .55rem;
-    min-height: 96px; padding: .8rem .5rem;
-    font-family: inherit; font-size: .85rem; font-weight: 600; line-height: 1.15; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .85rem;
+    min-height: clamp(104px, 16vh, 170px); padding: 1rem .6rem;
+    font-family: inherit; font-size: .92rem; font-weight: 600; line-height: 1.15; text-align: center;
     color: var(--text);
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, .22);
+    background: linear-gradient(180deg, rgba(var(--c), .12), rgba(var(--c), .02) 65%), var(--surface-2);
+    border: 1px solid rgba(var(--c), .22);
+    border-radius: 20px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 6px 16px rgba(0, 0, 0, .28);
     transition: transform .08s ease, border-color .15s;
     touch-action: manipulation;
 }
 .cmd-btn:nth-child(3n+2) { --c: 92, 200, 255; }
 .cmd-btn:nth-child(3n)   { --c: 61, 220, 151; }
 .cmd-ico {
-    width: 46px; height: 46px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 1.3rem;
-    color: rgb(var(--c)); background: rgba(var(--c), .14);
-    box-shadow: inset 0 0 0 1px rgba(var(--c), .3);
+    width: 3.6rem; height: 3.6rem; border-radius: 18px;
+    display: grid; place-items: center; font-size: 1.6rem;
+    color: rgb(var(--c));
+    background: linear-gradient(145deg, rgba(var(--c), .3), rgba(var(--c), .08));
+    box-shadow: inset 0 0 0 1px rgba(var(--c), .35), 0 6px 14px rgba(var(--c), .18);
     transition: background .15s, color .15s;
 }
-.cmd-btn:active, .cmd-btn.sent { transform: scale(.95); border-color: rgba(var(--c), .6); }
-.cmd-btn:active .cmd-ico, .cmd-btn.sent .cmd-ico { background: rgb(var(--c)); color: #0d1220; }
+.cmd-btn:active, .cmd-btn.sent { transform: scale(.96); border-color: rgba(var(--c), .7); }
+.cmd-btn:active .cmd-ico, .cmd-btn.sent .cmd-ico { background: linear-gradient(145deg, rgb(var(--c)), rgba(var(--c), .75)); color: #0d1220; }
 .cmd-btn:disabled { opacity: .4; }
 
 /* ===== Demos ===== */
@@ -326,12 +331,20 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
 
 /* ===== Tableta y escritorio ===== */
 @media (min-width: 768px) {
-    :root { --joy: 210px; }
+    :root { --joy: clamp(140px, min(calc(27vw - 3.6rem), 36vh), 330px); }
     .app-main {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        align-items: start;
-        gap: 1.25rem;
-        padding: 1.5rem;
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+        align-items: stretch;
+        gap: 1.5rem;
+        padding: 1.75rem 2rem;
     }
+    .panel { padding: 1.5rem; }
+    .drive-panel { justify-content: center; gap: 1.6rem; padding: 1.6rem 1.5rem; }
+    .pad-title { font-size: 1rem; margin-bottom: 1.1rem; }
+    .pad-hint { font-size: .8rem; }
+    .side-column { gap: 1.5rem; }
+}
+@media (min-width: 1200px) {
+    html { font-size: clamp(16px, calc(.45vw + 9px), 19px); }
 }
