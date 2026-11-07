@@ -1,0 +1,79 @@
+:root {
+    --joystick-size: 220px;
+    --knob-size: 80px;
+}
+
+body {
+    overscroll-behavior-y: contain; 
+    touch-action: pan-x pan-y;
+    background-color: #f8f9fa;
+}
+
+.max-w-sm { 
+    max-width: 400px; 
+    margin: 0 auto; 
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.joystick-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.joystick-zone {
+    width: var(--joystick-size);
+    height: var(--joystick-size);
+    background: radial-gradient(circle, #e9ecef 0%, #dee2e6 100%);
+    border-radius: 50%;
+    position: relative;
+    border: 5px solid #ced4da;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    touch-action: none; 
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.joystick-knob {
+    width: var(--knob-size);
+    height: var(--knob-size);
+    background: radial-gradient(circle, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 50%;
+    position: absolute;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15), inset 0 -2px 4px rgba(0,0,0,0.05);
+    border: 2px solid #adb5bd;
+    cursor: grab;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #6c757d;
+    font-size: 1.5rem;
+    transition: transform 0s;
+}
+
+.joystick-knob:active {
+    cursor: grabbing;
+    background: radial-gradient(circle, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.joystick-knob.returning {
+    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+#btn-stop {
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    letter-spacing: 1px;
+}
+#btn-stop:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.5) !important;
+}
