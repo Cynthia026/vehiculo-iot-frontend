@@ -1,7 +1,7 @@
 // js/app.js
 import { api } from './api.js';
 import { wsManager } from './websocket.js';
-import { ui } from './ui.js';
+import { ui, normalizar } from './ui.js';
 import { Joystick } from './joystick.js';
 import { CONFIG } from './config.js'; // Importado para acceder a la URL base
 
@@ -47,6 +47,7 @@ async function inicializar() {
 
         // 6. Inicializar Joystick
         new Joystick('joystick-zone', 'joystick-knob', manejarMovimientoJoystick, detenerVehiculo);
+        new Joystick('joystick-zone-arm', 'joystick-knob-arm', manejarMovimientoBrazo, detenerVehiculo);
 
         // Ocultar mensaje de error si todo cargó bien
         document.getElementById('action-feedback').classList.add('d-none');
@@ -98,6 +99,18 @@ async function manejarMovimientoJoystick(direccion) {
     if (comando) {
         ejecutarComando(comando.id_comando, comando.nombre);
     }
+}
+
+// Segundo joystick: brazo (arriba/abajo) y motores (izquierda/derecha)
+async function manejarMovimientoBrazo(direccion) {
+    const mapa = {
+        'ADELANTE': 'SUBIR_BRAZO',
+        'ATRAS': 'BAJAR_BRAZO',
+        'IZQUIERDA': 'MOTOR_IZQUIERDA',
+        'DERECHA': 'MOTOR_DERECHA'
+    };
+    const comando = catalogoComandos.find(c => normalizar(c.nombre || c.comando || '') === mapa[direccion]);
+    if (comando) ejecutarComando(comando.id_comando, comando.nombre);
 }
 
 async function ejecutarComando(idComando, nombreComando) {

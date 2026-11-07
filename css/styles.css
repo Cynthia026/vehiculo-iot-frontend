@@ -14,7 +14,7 @@
     --danger: #ff5d6c;
     --info: #5cc8ff;
     --radius: 22px;
-    --joy: min(74vw, 280px);
+    --joy: clamp(116px, calc((100vw - 6rem) / 2), 200px);
     --knob: calc(var(--joy) * .38);
     font-family: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -59,10 +59,10 @@ body {
 .app-title h1 { font-size: 1.05rem; font-weight: 600; margin: 0; line-height: 1.1; }
 .app-title small { color: var(--muted); font-size: .75rem; }
 .app-title-icon {
-    width: 40px; height: 40px; border-radius: 13px;
-    display: grid; place-items: center;
-    background: linear-gradient(145deg, var(--accent), #ff8a3a);
-    color: var(--accent-ink); font-size: 1.2rem;
+    width: 42px; height: 42px; border-radius: 13px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, .14);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .4);
 }
 
 .status-group { display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -136,76 +136,87 @@ body {
 #action-feedback.alert-warning { border-color: rgba(255, 180, 58, .4); color: var(--warn); background: rgba(255, 180, 58, .1); }
 #action-feedback.alert-info    { border-color: rgba(92, 200, 255, .4); color: var(--info); background: rgba(92, 200, 255, .1); }
 
-/* ===== Joystick ===== */
-.drive-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.2rem;
-    padding: 1.6rem 1.1rem 1.2rem;
-}
-.joystick-wrapper { display: flex; flex-direction: column; align-items: center; }
+/* ===== Joysticks ===== */
+.drive-panel { display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 1.2rem .8rem 1.1rem; }
+.pad-row { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; justify-items: center; }
+.pad { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.pad-title { margin: 0 0 .85rem; font-size: .85rem; font-weight: 600; color: var(--text); }
+.pad-hint { margin: .85rem 0 0; font-size: .72rem; color: var(--muted); text-align: center; }
 
 .joystick-zone {
+    --j1: #ffd488; --j2: #ffb43a; --j3: #e8892a; --jrgb: 255, 180, 58;
     position: relative;
     width: var(--joy);
     height: var(--joy);
     border-radius: 50%;
     background:
-        radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(255, 255, 255, .05) 34.5% 35%, transparent 35.5%),
-        radial-gradient(circle at 50% 35%, #25324f, #131a2d 72%);
-    border: 1px solid rgba(255, 255, 255, .1);
+        linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)) center / 1px 58% no-repeat,
+        linear-gradient(rgba(255,255,255,.06), rgba(255,255,255,.06)) center / 58% 1px no-repeat,
+        radial-gradient(circle at 50% 38%, #26345a 0%, #141c33 70%);
     box-shadow:
-        inset 0 8px 24px rgba(0, 0, 0, .55),
-        0 0 0 8px rgba(255, 180, 58, .05),
-        0 20px 40px rgba(0, 0, 0, .4);
+        inset 0 10px 26px rgba(0, 0, 0, .6),
+        0 0 0 1px rgba(255, 255, 255, .09),
+        0 0 0 7px rgba(var(--jrgb), .06),
+        0 18px 36px rgba(0, 0, 0, .45);
     touch-action: none;
     cursor: grab;
 }
+.joystick-alt { --j1: #a6ebff; --j2: #5cc8ff; --j3: #2a8fd0; --jrgb: 92, 200, 255; }
 .joystick-zone:active { cursor: grabbing; }
 
-.jz-mark {
-    position: absolute;
-    color: rgba(255, 255, 255, .22);
-    font-size: 1.15rem;
-    pointer-events: none;
+/* Marcas tipo dial */
+.joystick-zone::before {
+    content: ""; position: absolute; inset: 6%; border-radius: 50%; z-index: 0; pointer-events: none;
+    background: repeating-conic-gradient(rgba(255,255,255,.22) 0 1.2deg, transparent 1.2deg 15deg);
+    -webkit-mask: radial-gradient(circle closest-side, transparent 90%, #000 91%);
+            mask: radial-gradient(circle closest-side, transparent 90%, #000 91%);
 }
-.jz-up    { top: 9px;    left: 50%; transform: translateX(-50%); }
-.jz-down  { bottom: 9px; left: 50%; transform: translateX(-50%); }
-.jz-left  { left: 11px;  top: 50%;  transform: translateY(-50%); }
-.jz-right { right: 11px; top: 50%;  transform: translateY(-50%); }
+/* Sector iluminado según la dirección activa */
+.joystick-zone::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; z-index: 0; pointer-events: none;
+    opacity: 0; transition: opacity .12s;
+    background: conic-gradient(from var(--wa, -45deg), rgba(var(--jrgb), .9) 0 90deg, transparent 90deg);
+    -webkit-mask: radial-gradient(circle closest-side, transparent 82%, #000 83%);
+            mask: radial-gradient(circle closest-side, transparent 82%, #000 83%);
+}
+.joystick-zone[data-dir]::after { opacity: 1; }
+.joystick-zone[data-dir="ADELANTE"]  { --wa: -45deg; }
+.joystick-zone[data-dir="DERECHA"]   { --wa: 45deg; }
+.joystick-zone[data-dir="ATRAS"]     { --wa: 135deg; }
+.joystick-zone[data-dir="IZQUIERDA"] { --wa: 225deg; }
+
+.jz-mark { position: absolute; z-index: 1; color: rgba(255, 255, 255, .3); font-size: 1rem; pointer-events: none; transform: translate(-50%, -50%); transition: color .12s; }
+.jz-up    { top: 19%; left: 50%; }
+.jz-down  { top: 81%; left: 50%; }
+.jz-left  { top: 50%; left: 19%; }
+.jz-right { top: 50%; left: 81%; }
+.joystick-zone[data-dir="ADELANTE"] .jz-up,
+.joystick-zone[data-dir="ATRAS"] .jz-down,
+.joystick-zone[data-dir="IZQUIERDA"] .jz-left,
+.joystick-zone[data-dir="DERECHA"] .jz-right { color: var(--j1); }
 
 .joystick-knob {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: var(--knob);
-    height: var(--knob);
+    position: absolute; z-index: 2;
+    top: 50%; left: 50%;
+    width: var(--knob); height: var(--knob);
     margin: calc(var(--knob) / -2) 0 0 calc(var(--knob) / -2);
     border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: calc(var(--knob) * .36);
-    color: var(--accent-ink);
-    background: radial-gradient(circle at 35% 28%, #ffd488, var(--accent) 55%, #e8892a);
+    display: grid; place-items: center;
+    font-size: calc(var(--knob) * .34);
+    color: rgba(30, 16, 0, .75);
+    background:
+        radial-gradient(circle, transparent 0 40%, rgba(0,0,0,.14) 41% 43%, transparent 44%),
+        radial-gradient(circle at 34% 26%, var(--j1), var(--j2) 55%, var(--j3));
     box-shadow:
-        0 10px 22px rgba(255, 150, 30, .35),
-        inset 0 -6px 12px rgba(120, 60, 0, .3),
+        0 10px 20px rgba(var(--jrgb), .3),
+        0 0 0 4px rgba(var(--jrgb), .12),
+        inset 0 -6px 12px rgba(0, 0, 0, .28),
         inset 0 3px 6px rgba(255, 255, 255, .5);
     touch-action: none;
     will-change: transform;
 }
+.joystick-alt .joystick-knob { color: rgba(4, 26, 46, .8); }
 .joystick-knob.returning { transition: transform .2s cubic-bezier(.25, .8, .25, 1); }
-.joystick-zone[data-dir="ADELANTE"] .jz-up,
-.joystick-zone[data-dir="ATRAS"] .jz-down,
-.joystick-zone[data-dir="IZQUIERDA"] .jz-left,
-.joystick-zone[data-dir="DERECHA"] .jz-right { color: var(--accent); text-shadow: 0 0 12px rgba(255, 180, 58, .8); }
-.joystick-hint {
-    margin: 1.1rem 0 0;
-    font-size: .8rem;
-    font-weight: 500;
-    color: var(--muted);
-}
 
 /* ===== Botón detener ===== */
 .btn-stop {
@@ -226,83 +237,61 @@ body {
 .btn-stop:disabled { opacity: .35; box-shadow: none; }
 .btn-stop i { font-size: 1.4rem; }
 
-/* ===== Catálogo de comandos (se llena desde app.js) ===== */
-.commands-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .6rem;
-    margin: 0;
-}
-.commands-grid > * {
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-    flex: none;
-}
-.commands-grid .commands-loading,
-.commands-grid > .col-12 {
-    grid-column: 1 / -1;
-    text-align: center;
-    color: var(--muted);
-    font-size: .85rem;
-    padding: .6rem 0;
-}
-.commands-grid button {
-    flex-direction: column;
-    text-align: center;
-    width: 100%;
-    min-height: 58px;
-    display: flex; align-items: center; justify-content: center; gap: .5rem;
-    padding: .6rem .7rem;
-    font-family: inherit; font-size: .88rem; font-weight: 600; line-height: 1.15;
-    color: var(--text) !important;
-    background: var(--surface-2) !important;
-    border: 1px solid var(--line) !important;
-    border-radius: 16px;
+/* ===== Accesorios (se llena desde ui.js) ===== */
+.commands-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: .65rem; margin: 0; }
+.commands-grid .commands-loading { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: .85rem; padding: .6rem 0; }
+.cmd-btn {
+    --c: 255, 180, 58;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .55rem;
+    min-height: 96px; padding: .8rem .5rem;
+    font-family: inherit; font-size: .85rem; font-weight: 600; line-height: 1.15; text-align: center;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 18px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, .22);
-    transition: transform .08s ease, background .15s, border-color .15s;
+    transition: transform .08s ease, border-color .15s;
     touch-action: manipulation;
 }
-.commands-grid button i { font-size: 1.2rem; color: var(--accent); }
-.commands-grid button:active:not(:disabled),
-.commands-grid .active {
-    transform: scale(.96);
-    background: rgba(255, 180, 58, .16) !important;
-    border-color: rgba(255, 180, 58, .5) !important;
+.cmd-btn:nth-child(3n+2) { --c: 92, 200, 255; }
+.cmd-btn:nth-child(3n)   { --c: 61, 220, 151; }
+.cmd-ico {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 1.3rem;
+    color: rgb(var(--c)); background: rgba(var(--c), .14);
+    box-shadow: inset 0 0 0 1px rgba(var(--c), .3);
+    transition: background .15s, color .15s;
 }
-.commands-grid button:disabled { opacity: .4; }
+.cmd-btn:active, .cmd-btn.sent { transform: scale(.95); border-color: rgba(var(--c), .6); }
+.cmd-btn:active .cmd-ico, .cmd-btn.sent .cmd-ico { background: rgb(var(--c)); color: #0d1220; }
+.cmd-btn:disabled { opacity: .4; }
 
 /* ===== Demos ===== */
+.demo-caption { margin: -.5rem 0 .9rem; font-size: .78rem; color: var(--muted); }
+.demo-picker { position: relative; margin-bottom: .75rem; }
+.demo-picker > i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); z-index: 1; color: var(--accent); font-size: 1.15rem; pointer-events: none; }
 .demo-select {
-    font-family: inherit;
-    font-size: .95rem;
-    min-height: 52px;
-    color: var(--text);
-    background-color: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    margin-bottom: .75rem;
+    font-family: inherit; font-size: .95rem; min-height: 52px;
+    padding-left: 2.8rem;
+    color: var(--text); background-color: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 14px;
     --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%238d98b5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
 }
 .demo-select:focus { background-color: var(--surface-2); color: var(--text); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 180, 58, .2); }
 .demo-select option { background: var(--surface); color: var(--text); }
 
-.demo-actions { display: flex; gap: .6rem; }
+.demo-actions { display: grid; grid-template-columns: 1.5fr 1fr; gap: .6rem; }
 .btn-demo {
-    flex: 1;
-    min-height: 52px;
-    display: flex; align-items: center; justify-content: center; gap: .4rem;
+    min-height: 54px; display: flex; align-items: center; justify-content: center; gap: .45rem;
     font-family: inherit; font-size: .95rem; font-weight: 600;
-    border-radius: 14px;
-    border: 1px solid transparent;
-    transition: transform .08s ease, opacity .2s;
-    touch-action: manipulation;
+    border-radius: 14px; border: 1px solid transparent;
+    transition: transform .08s ease, opacity .2s; touch-action: manipulation;
 }
+.btn-demo i { font-size: 1.15rem; }
 .btn-demo:active:not(:disabled) { transform: scale(.97); }
 .btn-demo:disabled { opacity: .35; }
-.btn-demo-start { background: linear-gradient(180deg, #4ee5a4, #26b878); color: #05281a; }
-.btn-demo-cancel { background: transparent; color: var(--danger); border-color: rgba(255, 93, 108, .5); }
+.btn-demo-start { background: linear-gradient(180deg, #4ee5a4, #26b878); color: #05281a; box-shadow: 0 8px 20px rgba(38, 184, 120, .3); }
+.btn-demo-cancel { background: rgba(255, 93, 108, .1); color: var(--danger); border-color: rgba(255, 93, 108, .4); }
 
 /* ===== Pie ===== */
 .app-footer {
@@ -329,15 +318,15 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
     .app-main { padding: .8rem; }
 }
 @media (max-height: 640px) and (orientation: landscape) {
-    :root { --joy: min(60vh, 240px); }
+    :root { --joy: min(34vh, 24vw); }
     .app-main { flex-direction: row; align-items: flex-start; }
-    .drive-panel { flex: 0 0 auto; }
+    .drive-panel { flex: 1.3 1 0; }
     .side-column { flex: 1; }
 }
 
 /* ===== Tableta y escritorio ===== */
 @media (min-width: 768px) {
-    :root { --joy: 300px; }
+    :root { --joy: 210px; }
     .app-main {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -345,5 +334,4 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
         gap: 1.25rem;
         padding: 1.5rem;
     }
-    .commands-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

@@ -1,5 +1,7 @@
 // js/ui.js
 const ICONOS = [
+    [/SONIDO|AUDIO|VOLUM/, 'volume-up-fill'],
+    [/MOTOR/, 'gear-fill'],
     [/LUZ|LUCES/, 'lightbulb-fill'],
     [/CLAXON|BOCINA/, 'megaphone-fill'],
     [/ACELER|RAPID|TURBO/, 'speedometer2'],
@@ -7,9 +9,19 @@ const ICONOS = [
     [/360|GIRO|VUELTA/, 'arrow-repeat'],
     [/ZIG/, 'bezier2']
 ];
-const iconoPara = (n) => (ICONOS.find(([re]) => re.test(n.toUpperCase())) || [,'lightning-charge-fill'])[1];
-const etiqueta = (n) => { const t = n.replace(/_/g, ' ').toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
 
+// Normaliza nombres: sin acentos, mayúsculas y con guion bajo ("Subir brazo" -> SUBIR_BRAZO)
+export const normalizar = (n) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/[\s-]+/g, '_');
+
+const iconoPara = (nombre) => {
+    const hit = ICONOS.find(([re]) => re.test(nombre.toUpperCase()));
+    return hit ? hit[1] : 'lightning-charge-fill';
+};
+
+const etiqueta = (nombre) => {
+    const t = nombre.replace(/_/g, ' ').toLowerCase();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+};
 class UIController {
     constructor() {
         this.feedback = document.getElementById('action-feedback');
@@ -28,15 +40,30 @@ class UIController {
     }
 
     updateAwsStatus(text) {
-        const type = text === 'Disponible' ? 'success' : (text === 'Comprobando...' ? 'warning' : 'danger');
+        let type = 'secondary';
+        if (text === 'Disponible') type = 'success';
+        else if (text === 'Comprobando...') type = 'warning';
+        else type = 'danger';
+
         this.statusAws.className = `badge bg-${type} status-badge`;
         this.statusAws.innerHTML = `<i class="bi bi-cloud-check"></i> AWS: ${text}`;
+    }
+
+    // Alias de compatibilidad
+    updateAws(isAvailable) {
+        this.updateAwsStatus(isAvailable ? 'Disponible' : 'No disponible');
+    }
+
+    updateWss(state, type) {
+        this.updateWssStatus(state, type);
     }
 
     showFeedback(message, type = 'info') {
         clearTimeout(this._timer);
         this.feedback.textContent = message;
         this.feedback.className = `alert alert-${type}`;
+
+        // Ocultar después de 2 segundos si no es un error
         if (type !== 'danger') {
             this._timer = setTimeout(() => this.feedback.classList.add('d-none'), 2000);
         }
@@ -50,16 +77,22 @@ class UIController {
         if (btnStop) btnStop.disabled = false;
         
         // Excluimos los comandos que ya controla el joystick y el botón rojo
-        const excluidos = ['AVANZAR', 'RETROCEDER', 'GIRAR_IZQUIERDA', 'GIRAR_DERECHA', 'Detener', 'DETENER', 'STOP'];
+        const excluidos = ['AVANZAR', 'RETROCEDER', 'GIRAR_IZQUIERDA', 'GIRAR_DERECHA', 'DETENER', 'STOP',
+                          'SUBIR_BRAZO', 'BAJAR_BRAZO', 'MOTOR_IZQUIERDA', 'MOTOR_DERECHA']; // los controlan los joysticks
         
         comandos.forEach(cmd => {
             const nombreCmd = cmd.nombre || cmd.comando;
-            if (nombreCmd && !excluidos.includes(nombreCmd)) {
+            if (nombreCmd && !excluidos.includes(normalizar(nombreCmd))) {
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'cmd-btn';
-                btn.innerHTML = `<i class="bi bi-${iconoPara(nombreCmd)}"></i><span>${etiqueta(nombreCmd)}</span>`;
-                btn.onclick = () => { this.vibrar(); onCommandClick(cmd.id_comando, nombreCmd); };
+                btn.innerHTML = `<span class="cmd-ico"><i class="bi bi-${iconoPara(nombreCmd)}"></i></span><span>${etiqueta(nombreCmd)}</span>`;
+                btn.onclick = () => {
+                    this.vibrar();
+                    btn.classList.add('sent');
+                    setTimeout(() => btn.classList.remove('sent'), 250);
+                    onCommandClick(cmd.id_comando, nombreCmd);
+                };
                 container.appendChild(btn);
             }
         });

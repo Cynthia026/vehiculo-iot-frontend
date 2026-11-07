@@ -24,7 +24,7 @@
     <!-- Encabezado: título y estado de conectividad -->
     <header class="app-header">
         <div class="app-title">
-            <span class="app-title-icon"><i class="bi bi-car-front-fill"></i></span>
+            <img class="app-title-icon" src="assets/Favicon_Iot_vehiculo.jpg" alt="Logo Vehículo IoT">
             <div>
                 <h1>Vehículo IoT</h1>
                 <small>Unidad 1</small>
@@ -48,20 +48,31 @@
         <div id="action-feedback" class="alert alert-info d-none" role="alert">Iniciando...</div>
 
         <!-- Panel de conducción -->
-        <section class="panel drive-panel" aria-label="Conducción">
-            <div class="joystick-wrapper">
-                <div id="joystick-zone" class="joystick-zone" role="application" aria-label="Joystick de movimiento">
-                    <span class="jz-mark jz-up"><i class="bi bi-chevron-up"></i></span>
-                    <span class="jz-mark jz-down"><i class="bi bi-chevron-down"></i></span>
-                    <span class="jz-mark jz-left"><i class="bi bi-chevron-left"></i></span>
-                    <span class="jz-mark jz-right"><i class="bi bi-chevron-right"></i></span>
-                    <div id="joystick-knob" class="joystick-knob">
-                        <i class="bi bi-arrows-move"></i>
+        <section class="panel drive-panel" aria-label="Controles de conducción">
+            <div class="pad-row">
+                <div class="pad">
+                    <h2 class="pad-title">Movimiento</h2>
+                    <div id="joystick-zone" class="joystick-zone" role="application" aria-label="Joystick de movimiento">
+                        <span class="jz-mark jz-up"><i class="bi bi-chevron-up"></i></span>
+                            <span class="jz-mark jz-down"><i class="bi bi-chevron-down"></i></span>
+                            <span class="jz-mark jz-left"><i class="bi bi-chevron-left"></i></span>
+                            <span class="jz-mark jz-right"><i class="bi bi-chevron-right"></i></span>
+                        <div id="joystick-knob" class="joystick-knob"><i class="bi bi-arrows-move"></i></div>
                     </div>
+                    <p class="pad-hint">Avanzar · Retroceder · Girar</p>
                 </div>
-                <p class="joystick-hint"><i class="bi bi-hand-index-thumb"></i> Arrastra para mover</p>
+                <div class="pad">
+                    <h2 class="pad-title">Brazo y motores</h2>
+                    <div id="joystick-zone-arm" class="joystick-zone joystick-alt" role="application" aria-label="Joystick de brazo y motores">
+                        <span class="jz-mark jz-up"><i class="bi bi-arrow-bar-up"></i></span>
+                            <span class="jz-mark jz-down"><i class="bi bi-arrow-bar-down"></i></span>
+                            <span class="jz-mark jz-left"><i class="bi bi-arrow-counterclockwise"></i></span>
+                            <span class="jz-mark jz-right"><i class="bi bi-arrow-clockwise"></i></span>
+                        <div id="joystick-knob-arm" class="joystick-knob"><i class="bi bi-gear-wide-connected"></i></div>
+                    </div>
+                    <p class="pad-hint">Brazo ↕ · Motores ↔</p>
+                </div>
             </div>
-
             <button id="btn-stop" class="btn-stop" disabled>
                 <i class="bi bi-sign-stop-fill"></i> Detener
             </button>
@@ -69,8 +80,8 @@
 
         <!-- Comandos y secuencias -->
         <div class="side-column">
-            <section class="panel" aria-label="Comandos">
-                <h2 class="panel-title"><i class="bi bi-grid-fill"></i> Comandos</h2>
+            <section class="panel" aria-label="Accesorios">
+                <h2 class="panel-title"><i class="bi bi-sliders2"></i> Accesorios</h2>
                 <div id="extra-commands-container" class="commands-grid">
                     <div class="commands-loading" id="cmds-loading">Conectando con AWS...</div>
                 </div>
@@ -78,9 +89,13 @@
 
             <section class="panel" aria-label="Secuencias demo">
                 <h2 class="panel-title"><i class="bi bi-play-circle-fill"></i> Secuencias demo</h2>
-                <select id="demo-select" class="form-select demo-select" aria-label="Seleccionar demo">
-                    <option value="" selected>Cargando demos...</option>
-                </select>
+                <p class="demo-caption">Ejecuta una rutina automática del vehículo.</p>
+                <div class="demo-picker">
+                    <i class="bi bi-collection-play"></i>
+                    <select id="demo-select" class="form-select demo-select" aria-label="Seleccionar demo">
+                        <option value="" selected>Cargando demos...</option>
+                    </select>
+                </div>
                 <div class="demo-actions">
                     <button id="btn-demo-start" class="btn-demo btn-demo-start" disabled>
                         <i class="bi bi-play-fill"></i> Iniciar
