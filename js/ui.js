@@ -1,45 +1,44 @@
 // js/ui.js
+const ICONOS = [
+    [/LUZ|LUCES/, 'lightbulb-fill'],
+    [/CLAXON|BOCINA/, 'megaphone-fill'],
+    [/ACELER|RAPID|TURBO/, 'speedometer2'],
+    [/LENT|FRENAR/, 'hourglass-split'],
+    [/360|GIRO|VUELTA/, 'arrow-repeat'],
+    [/ZIG/, 'bezier2']
+];
+const iconoPara = (n) => (ICONOS.find(([re]) => re.test(n.toUpperCase())) || [,'lightning-charge-fill'])[1];
+const etiqueta = (n) => { const t = n.replace(/_/g, ' ').toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+
 class UIController {
     constructor() {
         this.feedback = document.getElementById('action-feedback');
         this.statusWss = document.getElementById('status-wss');
         this.statusAws = document.getElementById('status-aws');
+        this._timer = null;
+    }
+
+    vibrar(ms = 12) {
+        if (navigator.vibrate) navigator.vibrate(ms);
     }
 
     updateWssStatus(text, type) {
-        this.statusWss.className = `badge bg-${type} border border-light status-badge`;
+        this.statusWss.className = `badge bg-${type} status-badge`;
         this.statusWss.innerHTML = `<i class="bi bi-broadcast"></i> WSS: ${text}`;
     }
 
     updateAwsStatus(text) {
-        let type = 'secondary';
-        if (text === 'Disponible') type = 'success';
-        else if (text === 'Comprobando...') type = 'warning';
-        else type = 'danger';
-
-        this.statusAws.className = `badge bg-${type} border border-light status-badge`;
+        const type = text === 'Disponible' ? 'success' : (text === 'Comprobando...' ? 'warning' : 'danger');
+        this.statusAws.className = `badge bg-${type} status-badge`;
         this.statusAws.innerHTML = `<i class="bi bi-cloud-check"></i> AWS: ${text}`;
     }
 
-    // Alias de compatibilidad
-    updateAws(isAvailable) {
-        this.updateAwsStatus(isAvailable ? 'Disponible' : 'No disponible');
-    }
-
-    updateWss(state, type) {
-        this.updateWssStatus(state, type);
-    }
-
     showFeedback(message, type = 'info') {
+        clearTimeout(this._timer);
         this.feedback.textContent = message;
-        this.feedback.className = `alert alert-${type} w-100 max-w-sm text-center mx-auto mb-3 shadow-sm`;
-        this.feedback.classList.remove('d-none');
-        
-        // Ocultar después de 2 segundos si no es un error
-        if(type !== 'danger'){
-            setTimeout(() => {
-                this.feedback.classList.add('d-none');
-            }, 2000);
+        this.feedback.className = `alert alert-${type}`;
+        if (type !== 'danger') {
+            this._timer = setTimeout(() => this.feedback.classList.add('d-none'), 2000);
         }
     }
 
@@ -56,14 +55,12 @@ class UIController {
         comandos.forEach(cmd => {
             const nombreCmd = cmd.nombre || cmd.comando;
             if (nombreCmd && !excluidos.includes(nombreCmd)) {
-                const div = document.createElement('div');
-                div.className = 'col-6 mb-2';
                 const btn = document.createElement('button');
-                btn.className = 'btn btn-outline-primary w-100 h-100';
-                btn.textContent = nombreCmd;
-                btn.onclick = () => onCommandClick(cmd.id_comando, nombreCmd);
-                div.appendChild(btn);
-                container.appendChild(div);
+                btn.type = 'button';
+                btn.className = 'cmd-btn';
+                btn.innerHTML = `<i class="bi bi-${iconoPara(nombreCmd)}"></i><span>${etiqueta(nombreCmd)}</span>`;
+                btn.onclick = () => { this.vibrar(); onCommandClick(cmd.id_comando, nombreCmd); };
+                container.appendChild(btn);
             }
         });
     }

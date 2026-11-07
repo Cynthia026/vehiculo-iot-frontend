@@ -67,10 +67,10 @@ async function verificarRDS() {
         if (response.ok) {
             const data = await response.json();
             if (data.rds === 'Disponible') {
-                rdsBadge.className = 'badge bg-success border border-light';
+                rdsBadge.className = 'badge bg-success status-badge';
                 rdsBadge.innerHTML = `<i class="bi bi-database-check"></i> RDS: Disponible`;
             } else {
-                rdsBadge.className = 'badge bg-danger border border-light';
+                rdsBadge.className = 'badge bg-danger status-badge';
                 rdsBadge.innerHTML = `<i class="bi bi-database-x"></i> RDS: No disponible`;
             }
         } else {
@@ -78,7 +78,7 @@ async function verificarRDS() {
         }
     } catch (error) {
         console.error("Error al consultar RDS:", error);
-        rdsBadge.className = 'badge bg-secondary border border-light';
+        rdsBadge.className = 'badge bg-secondary status-badge';
         rdsBadge.innerHTML = `<i class="bi bi-database-dash"></i> RDS: Sin verificar`;
     }
 }

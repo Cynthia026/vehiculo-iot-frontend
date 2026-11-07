@@ -9,6 +9,7 @@ export class Joystick {
         this.onStop = onStop; 
         
         this.active = false;
+        this.pointerId = null;
         this.currentDirection = null;
         this.center = { x: 0, y: 0 };
         this.maxRadius = this.zone.offsetWidth / 2 - this.knob.offsetWidth / 2;
@@ -24,7 +25,11 @@ export class Joystick {
     }
 
     handleDown(e) {
+        if (this.active) return;
         this.active = true;
+        this.pointerId = e.pointerId;
+        this.zone.setPointerCapture?.(e.pointerId);
+        this.maxRadius = this.zone.offsetWidth / 2 - this.knob.offsetWidth / 2;
         this.knob.classList.remove('returning');
         const rect = this.zone.getBoundingClientRect();
         this.center = {
@@ -35,14 +40,16 @@ export class Joystick {
     }
 
     handleMove(e) {
-        if (!this.active) return;
+        if (!this.active || e.pointerId !== this.pointerId) return;
         e.preventDefault(); // Previene scroll en móviles
         this.updatePosition(e.clientX, e.clientY);
     }
 
-    handleUp() {
-        if (!this.active) return;
+    handleUp(e) {
+        if (!this.active || (e && e.pointerId !== this.pointerId)) return;
         this.active = false;
+        this.pointerId = null;
+        delete this.zone.dataset.dir;
         
         // Regresar al centro visualmente
         this.knob.style.transform = `translate(0px, 0px)`;
@@ -85,6 +92,8 @@ export class Joystick {
         // Solo envia si la dirección cambió (evita spam de POSTs)
         if (newDirection && newDirection !== this.currentDirection) {
             this.currentDirection = newDirection;
+            this.zone.dataset.dir = newDirection;
+            navigator.vibrate?.(15);
             this.onMove(newDirection);
         }
     }
