@@ -48,17 +48,17 @@ class UIController {
         const resize = () => {
             w = canvas.width = window.innerWidth;
             h = canvas.height = window.innerHeight;
-            const count = Math.min(220, Math.max(90, Math.floor((w * h) / 6500)));
+            const count = Math.min(280, Math.max(130, Math.floor((w * h) / 4500)));
             stars = Array.from({ length: count }, () => {
-                const layer = Math.random() < 0.6 ? 1 : (Math.random() < 0.85 ? 2 : 3);
+                const layer = Math.random() < 0.55 ? 1 : (Math.random() < 0.82 ? 2 : 3);
                 return {
                     x: Math.random() * w,
                     y: Math.random() * h,
-                    r: layer === 1 ? Math.random() * 0.9 + 0.3 : (layer === 2 ? Math.random() * 1.3 + 0.8 : Math.random() * 1.8 + 1.2),
-                    vx: (Math.random() - 0.5) * 0.06 * layer,
-                    vy: - (0.04 + Math.random() * 0.08) * layer,
-                    alpha: Math.random() * 0.6 + 0.3,
-                    twinkleSpeed: 0.008 + Math.random() * 0.025,
+                    r: layer === 1 ? Math.random() * 1.0 + 0.4 : (layer === 2 ? Math.random() * 1.5 + 0.9 : Math.random() * 2.1 + 1.3),
+                    vx: (Math.random() - 0.5) * 0.12 * layer,
+                    vy: - (0.08 + Math.random() * 0.14) * layer,
+                    alpha: Math.random() * 0.65 + 0.35,
+                    twinkleSpeed: 0.012 + Math.random() * 0.03,
                     twinklePhase: Math.random() * Math.PI * 2,
                     color: starColors[Math.floor(Math.random() * starColors.length)],
                     layer
@@ -66,9 +66,9 @@ class UIController {
             });
 
             nebulae = [
-                { x: w * 0.2, y: h * 0.25, r: Math.max(w, h) * 0.38, color: 'rgba(38, 70, 145, 0.12)', vx: 0.08, vy: 0.04 },
-                { x: w * 0.8, y: h * 0.35, r: Math.max(w, h) * 0.34, color: 'rgba(88, 42, 128, 0.10)', vx: -0.06, vy: 0.05 },
-                { x: w * 0.5, y: h * 0.8,  r: Math.max(w, h) * 0.40, color: 'rgba(20, 95, 135, 0.10)', vx: 0.05, vy: -0.04 }
+                { x: w * 0.2, y: h * 0.25, r: Math.max(w, h) * 0.42, color: 'rgba(48, 88, 185, 0.16)', vx: 0.12, vy: 0.06 },
+                { x: w * 0.8, y: h * 0.35, r: Math.max(w, h) * 0.38, color: 'rgba(110, 48, 165, 0.14)', vx: -0.10, vy: 0.07 },
+                { x: w * 0.5, y: h * 0.8,  r: Math.max(w, h) * 0.44, color: 'rgba(25, 115, 165, 0.14)', vx: 0.08, vy: -0.06 }
             ];
         };
 
