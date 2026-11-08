@@ -163,7 +163,6 @@ body {
         0 22px 44px rgba(0, 0, 0, .5);
     touch-action: none;
     cursor: grab;
-    transition: opacity .3s, filter .3s;
 }
 .joystick-alt { --j1: #a6ebff; --j2: #5cc8ff; --j3: #2a8fd0; --jrgb: 92, 200, 255; }
 .joystick-zone:active { cursor: grabbing; }
@@ -238,7 +237,7 @@ body {
     touch-action: manipulation;
 }
 .btn-stop:active:not(:disabled) { transform: scale(.97); filter: brightness(.92); }
-.btn-stop:disabled { opacity: .35; box-shadow: none; }
+.btn-stop:disabled { cursor: not-allowed; }
 .btn-stop i { font-size: 1.4rem; }
 
 /* ===== Accesorios (se llena desde ui.js) ===== */
@@ -271,13 +270,12 @@ body {
 }
 .cmd-btn:active, .cmd-btn.sent { transform: scale(.96); border-color: rgba(var(--c), .7); }
 .cmd-btn:active .cmd-ico, .cmd-btn.sent .cmd-ico { background: linear-gradient(145deg, rgb(var(--c)), rgba(var(--c), .75)); color: #0d1220; }
-.cmd-btn:disabled { opacity: .4; filter: saturate(.5); cursor: not-allowed; }
+.cmd-btn:disabled { cursor: not-allowed; }
 
-/* ===== Modo sin conexión (AWS apagado) ===== */
-.offline-note { display: none; align-items: center; gap: .5rem; margin: -.4rem 0 .9rem; font-size: .78rem; color: var(--warn); }
-.is-offline .offline-note { display: flex; }
-.is-offline .joystick-zone { opacity: .38; filter: grayscale(.5); pointer-events: none; cursor: not-allowed; }
-.demo-select:disabled { opacity: .5; }
+/* ===== Sin conexión: se ven igual, pero no responden ===== */
+.is-offline .joystick-zone { pointer-events: none; cursor: not-allowed; }
+.cmd-btn:disabled:active { transform: none; }
+.demo-select:disabled { background-color: var(--surface-2); color: var(--muted); opacity: 1; cursor: not-allowed; }
 
 /* ===== Demos ===== */
 .demo-caption { margin: -.5rem 0 .9rem; font-size: .78rem; color: var(--muted); }
@@ -302,7 +300,7 @@ body {
 }
 .btn-demo i { font-size: 1.15rem; }
 .btn-demo:active:not(:disabled) { transform: scale(.97); }
-.btn-demo:disabled { opacity: .35; }
+.btn-demo:disabled { cursor: not-allowed; }
 .btn-demo-start { background: linear-gradient(180deg, #4ee5a4, #26b878); color: #05281a; box-shadow: 0 8px 20px rgba(38, 184, 120, .3); }
 .btn-demo-cancel { background: rgba(255, 93, 108, .1); color: var(--danger); border-color: rgba(255, 93, 108, .4); }
 

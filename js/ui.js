@@ -121,7 +121,7 @@ class UIController {
         if (stop) stop.disabled = off;
         if (off) {
             const select = document.getElementById('demo-select');
-            select.innerHTML = '<option value="">Sin conexión con AWS</option>';
+            select.innerHTML = '<option value="">Demos no disponibles</option>';
             select.disabled = true;
             document.getElementById('btn-demo-start').disabled = true;
             document.getElementById('btn-demo-cancel').disabled = true;
