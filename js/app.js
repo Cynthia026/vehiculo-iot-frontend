@@ -25,12 +25,25 @@ function inicializar() {
 
 // Los eventos se enlazan una sola vez, aunque AWS esté apagado
 function configurarControles() {
-    document.getElementById('btn-stop').addEventListener('click', detenerVehiculo);
+    document.getElementById('btn-stop').addEventListener('click', () => {
+        ui.playSound('stop');
+        ui.vibrar(25);
+        detenerVehiculo();
+    });
+
+    document.getElementById('demo-select').addEventListener('change', () => {
+        ui.playSound('tap');
+    });
 
     document.getElementById('btn-demo-start').addEventListener('click', async () => {
         const select = document.getElementById('demo-select');
-        if (!select.value) return;
+        if (!select.value) {
+            ui.playSound('cancel');
+            return;
+        }
         try {
+            ui.playSound('start');
+            ui.vibrar(15);
             ui.showFeedback('Iniciando DEMO...', 'success');
             await api.ejecutarDemo(select.value);
         } catch (error) {
@@ -40,6 +53,8 @@ function configurarControles() {
 
     document.getElementById('btn-demo-cancel').addEventListener('click', async () => {
         try {
+            ui.playSound('cancel');
+            ui.vibrar(15);
             ui.showFeedback('Cancelando DEMO...', 'warning');
             await api.cancelarDemo();
         } catch (error) {
@@ -47,8 +62,14 @@ function configurarControles() {
         }
     });
 
-    new Joystick('joystick-zone', 'joystick-knob', manejarMovimientoJoystick, detenerVehiculo);
-    new Joystick('joystick-zone-arm', 'joystick-knob-arm', manejarMovimientoBrazo, detenerVehiculo);
+    new Joystick('joystick-zone', 'joystick-knob', (dir) => {
+        ui.playSound('joy');
+        manejarMovimientoJoystick(dir);
+    }, detenerVehiculo);
+    new Joystick('joystick-zone-arm', 'joystick-knob-arm', (dir) => {
+        ui.playSound('joy');
+        manejarMovimientoBrazo(dir);
+    }, detenerVehiculo);
 }
 
 // Carga los catálogos; si AWS no responde, reintenta cada 8 s

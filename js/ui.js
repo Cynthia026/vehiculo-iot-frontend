@@ -31,7 +31,76 @@ class UIController {
         this.statusWss = document.getElementById('status-wss');
         this.statusAws = document.getElementById('status-aws');
         this._timer = null;
+        this._audioCtx = null;
         this.initSpaceBackground();
+    }
+
+    _getAudioCtx() {
+        if (!this._audioCtx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this._audioCtx = new AudioCtx();
+        }
+        if (this._audioCtx && this._audioCtx.state === 'suspended') {
+            this._audioCtx.resume();
+        }
+        return this._audioCtx;
+    }
+
+    playSound(tipo = 'tap') {
+        try {
+            const ctx = this._getAudioCtx();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+
+            const tone = (freq, endFreq, duration, wave = 'sine', vol = 0.14, delay = 0) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = wave;
+                osc.frequency.setValueAtTime(freq, now + delay);
+                if (endFreq && endFreq !== freq) {
+                    osc.frequency.exponentialRampToValueAtTime(endFreq, now + delay + duration);
+                }
+                gain.gain.setValueAtTime(0.001, now + delay);
+                gain.gain.linearRampToValueAtTime(vol, now + delay + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + delay + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + delay);
+                osc.stop(now + delay + duration);
+            };
+
+            if (tipo === 'stop') {
+                // Tono descendente de freno / parada
+                tone(440, 180, 0.22, 'triangle', 0.2);
+                tone(320, 130, 0.22, 'sawtooth', 0.08);
+            } else if (tipo === 'start') {
+                // Doble nota ascendente de inicio
+                tone(523.25, 523.25, 0.1, 'sine', 0.16, 0);
+                tone(659.25, 783.99, 0.18, 'sine', 0.18, 0.09);
+            } else if (tipo === 'cancel') {
+                // Doble nota descendente de cancelación
+                tone(520, 440, 0.1, 'triangle', 0.15, 0);
+                tone(380, 260, 0.18, 'triangle', 0.15, 0.09);
+            } else if (tipo === 'horn') {
+                // Claxon / sonido
+                tone(480, 480, 0.2, 'sawtooth', 0.12, 0);
+                tone(600, 600, 0.2, 'triangle', 0.14, 0);
+            } else if (tipo === 'speed') {
+                // Aceleración / velocidad
+                tone(320, 880, 0.18, 'sine', 0.16, 0);
+            } else if (tipo === 'light') {
+                // Interruptor de luz
+                tone(880, 1174, 0.1, 'sine', 0.14, 0);
+            } else if (tipo === 'joy') {
+                // Pulso suave al mover el joystick
+                tone(420, 560, 0.06, 'sine', 0.09, 0);
+            } else {
+                // Clic futurista estándar
+                tone(620, 820, 0.08, 'sine', 0.14, 0);
+            }
+        } catch (e) {
+            // Ignorar si el navegador bloquea audio
+        }
     }
 
     initSpaceBackground() {
@@ -232,6 +301,11 @@ class UIController {
                 btn.innerHTML = `<span class="cmd-ico"><i class="bi bi-${iconoPara(nombreCmd)}"></i></span><span>${etiqueta(nombreCmd)}</span>`;
                 btn.onclick = () => {
                     this.vibrar();
+                    const norm = normalizar(nombreCmd);
+                    if (/SONIDO|CLAXON|BOCINA|AUDIO/.test(norm)) this.playSound('horn');
+                    else if (/VELOC|ACELER|TURBO|RAPID/.test(norm)) this.playSound('speed');
+                    else if (/LUZ|LUCES/.test(norm)) this.playSound('light');
+                    else this.playSound('tap');
                     btn.classList.add('sent');
                     setTimeout(() => btn.classList.remove('sent'), 250);
                     onCommandClick(cmd.id_comando, nombreCmd);
