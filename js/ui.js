@@ -4,7 +4,7 @@ const ICONOS = [
     [/MOTOR/, 'gear-fill'],
     [/LUZ|LUCES/, 'lightbulb-fill'],
     [/CLAXON|BOCINA/, 'megaphone-fill'],
-    [/ACELER|RAPID|TURBO/, 'speedometer2'],
+    [/VELOC|ACELER|RAPID|TURBO/, 'speedometer2'],
     [/LENT|FRENAR/, 'hourglass-split'],
     [/360|GIRO|VUELTA/, 'arrow-repeat'],
     [/ZIG/, 'bezier2']
@@ -22,6 +22,9 @@ const etiqueta = (nombre) => {
     const t = nombre.replace(/_/g, ' ').toLowerCase();
     return t.charAt(0).toUpperCase() + t.slice(1);
 };
+// Accesorios que se muestran (deshabilitados) mientras AWS no responde
+const ACCESORIOS_BASE = ['Velocidad', 'Sonido', 'Luz'];
+
 class UIController {
     constructor() {
         this.feedback = document.getElementById('action-feedback');
@@ -98,6 +101,33 @@ class UIController {
         });
     }
 
+    renderComandosPlaceholder() {
+        const container = document.getElementById('extra-commands-container');
+        container.innerHTML = '';
+        ACCESORIOS_BASE.forEach(nombre => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cmd-btn';
+            btn.disabled = true;
+            btn.innerHTML = `<span class="cmd-ico"><i class="bi bi-${iconoPara(nombre)}"></i></span><span>${nombre}</span>`;
+            container.appendChild(btn);
+        });
+    }
+
+    // Modo sin conexión: todo visible pero opaco y sin interacción
+    setOffline(off) {
+        document.body.classList.toggle('is-offline', off);
+        const stop = document.getElementById('btn-stop');
+        if (stop) stop.disabled = off;
+        if (off) {
+            const select = document.getElementById('demo-select');
+            select.innerHTML = '<option value="">Sin conexión con AWS</option>';
+            select.disabled = true;
+            document.getElementById('btn-demo-start').disabled = true;
+            document.getElementById('btn-demo-cancel').disabled = true;
+        }
+    }
+
     renderDemos(demos) {
         const select = document.getElementById('demo-select');
         select.innerHTML = '<option value="">Selecciona una DEMO</option>';
@@ -108,6 +138,7 @@ class UIController {
             select.appendChild(option);
         });
         
+        select.disabled = false;
         document.getElementById('btn-demo-start').disabled = false;
         document.getElementById('btn-demo-cancel').disabled = false;
     }

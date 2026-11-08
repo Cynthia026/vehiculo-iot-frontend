@@ -8,53 +8,74 @@ import { CONFIG } from './config.js'; // Importado para acceder a la URL base
 let catalogoComandos = [];
 let idComandoDetener = null;
 
-async function inicializar() {
+let reintentoTimer = null;
+let primerFallo = true;
+
+function inicializar() {
+    // 1. Mostrar toda la interfaz de inmediato, deshabilitada hasta que AWS responda
+    ui.renderComandosPlaceholder();
+    ui.setOffline(true);
+    configurarControles();
+
+    // 2. Conexiones
+    wsManager.connect();
+    verificarRDS();
+    cargarDatos();
+}
+
+// Los eventos se enlazan una sola vez, aunque AWS esté apagado
+function configurarControles() {
+    document.getElementById('btn-stop').addEventListener('click', detenerVehiculo);
+
+    document.getElementById('btn-demo-start').addEventListener('click', async () => {
+        const select = document.getElementById('demo-select');
+        if (!select.value) return;
+        try {
+            ui.showFeedback('Iniciando DEMO...', 'success');
+            await api.ejecutarDemo(select.value);
+        } catch (error) {
+            ui.showFeedback('No se pudo iniciar la DEMO', 'danger');
+        }
+    });
+
+    document.getElementById('btn-demo-cancel').addEventListener('click', async () => {
+        try {
+            ui.showFeedback('Cancelando DEMO...', 'warning');
+            await api.cancelarDemo();
+        } catch (error) {
+            ui.showFeedback('No se pudo cancelar la DEMO', 'danger');
+        }
+    });
+
+    new Joystick('joystick-zone', 'joystick-knob', manejarMovimientoJoystick, detenerVehiculo);
+    new Joystick('joystick-zone-arm', 'joystick-knob-arm', manejarMovimientoBrazo, detenerVehiculo);
+}
+
+// Carga los catálogos; si AWS no responde, reintenta cada 8 s
+async function cargarDatos() {
+    clearTimeout(reintentoTimer);
+    ui.updateAwsStatus('Comprobando...');
     try {
-        // 1. Iniciar WebSocket
-        wsManager.connect();
-
-        // 2. Verificar estado de Amazon RDS (Nuevo Endpoint)
-        await verificarRDS();
-
-        // 3. Cargar Catálogos
-        ui.updateAwsStatus('Comprobando...');
-        catalogoComandos = await api.obtenerComandos();
+        const comandos = await api.obtenerComandos();
         const demos = await api.obtenerDemos();
+        catalogoComandos = comandos;
 
-        // Buscar el ID del comando Detener (Sensible a mayúsculas/minúsculas)
         const cmdDetener = catalogoComandos.find(c => c.nombre === 'Detener');
         if (cmdDetener) idComandoDetener = cmdDetener.id_comando;
 
-        // 4. Renderizar UI Dinámica
         ui.renderComandos(catalogoComandos, ejecutarComando);
         ui.renderDemos(demos);
+        ui.setOffline(false);
 
-        // 5. Configurar Eventos Botones
-        document.getElementById('btn-stop').addEventListener('click', detenerVehiculo);
-        
-        document.getElementById('btn-demo-start').addEventListener('click', async () => {
-            const select = document.getElementById('demo-select');
-            if (select.value) {
-                ui.showFeedback('Iniciando DEMO...', 'success');
-                await api.ejecutarDemo(select.value);
-            }
-        });
-
-        document.getElementById('btn-demo-cancel').addEventListener('click', async () => {
-            ui.showFeedback('Cancelando DEMO...', 'warning');
-            await api.cancelarDemo();
-        });
-
-        // 6. Inicializar Joystick
-        new Joystick('joystick-zone', 'joystick-knob', manejarMovimientoJoystick, detenerVehiculo);
-        new Joystick('joystick-zone-arm', 'joystick-knob-arm', manejarMovimientoBrazo, detenerVehiculo);
-
-        // Ocultar mensaje de error si todo cargó bien
+        primerFallo = true;
         document.getElementById('action-feedback').classList.add('d-none');
-
     } catch (error) {
-        console.error("Error inicializando la app:", error);
-        ui.showFeedback('Error de red al cargar datos', 'danger');
+        console.error('Error cargando datos:', error);
+        if (primerFallo) {
+            ui.showFeedback('Sin conexión con AWS. Reintentando...', 'danger');
+            primerFallo = false;
+        }
+        reintentoTimer = setTimeout(cargarDatos, 8000);
     }
 }
 

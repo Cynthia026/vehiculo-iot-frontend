@@ -115,7 +115,7 @@ body {
 #action-feedback {
     position: fixed;
     left: 50%;
-    bottom: calc(1rem + env(safe-area-inset-bottom, 0));
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0));
     transform: translateX(-50%);
     z-index: 40;
     width: max-content;
@@ -163,6 +163,7 @@ body {
         0 22px 44px rgba(0, 0, 0, .5);
     touch-action: none;
     cursor: grab;
+    transition: opacity .3s, filter .3s;
 }
 .joystick-alt { --j1: #a6ebff; --j2: #5cc8ff; --j3: #2a8fd0; --jrgb: 92, 200, 255; }
 .joystick-zone:active { cursor: grabbing; }
@@ -270,7 +271,13 @@ body {
 }
 .cmd-btn:active, .cmd-btn.sent { transform: scale(.96); border-color: rgba(var(--c), .7); }
 .cmd-btn:active .cmd-ico, .cmd-btn.sent .cmd-ico { background: linear-gradient(145deg, rgb(var(--c)), rgba(var(--c), .75)); color: #0d1220; }
-.cmd-btn:disabled { opacity: .4; }
+.cmd-btn:disabled { opacity: .4; filter: saturate(.5); cursor: not-allowed; }
+
+/* ===== Modo sin conexión (AWS apagado) ===== */
+.offline-note { display: none; align-items: center; gap: .5rem; margin: -.4rem 0 .9rem; font-size: .78rem; color: var(--warn); }
+.is-offline .offline-note { display: flex; }
+.is-offline .joystick-zone { opacity: .38; filter: grayscale(.5); pointer-events: none; cursor: not-allowed; }
+.demo-select:disabled { opacity: .5; }
 
 /* ===== Demos ===== */
 .demo-caption { margin: -.5rem 0 .9rem; font-size: .78rem; color: var(--muted); }
