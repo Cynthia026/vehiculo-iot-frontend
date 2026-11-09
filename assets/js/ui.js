@@ -272,15 +272,80 @@ class UIController {
         this.updateWssStatus(state, type);
     }
 
-    showFeedback(message, type = 'info') {
+    showFeedback(message, type = 'info', duration = 2000) {
         clearTimeout(this._timer);
         this.feedback.textContent = message;
         this.feedback.className = `alert alert-${type}`;
 
-        // Ocultar después de 2 segundos si no es un error
-        if (type !== 'danger') {
-            this._timer = setTimeout(() => this.feedback.classList.add('d-none'), 2000);
+        // Ocultar después del tiempo indicado si no es un error
+        if (type !== 'danger' && duration > 0) {
+            this._timer = setTimeout(() => this.feedback.classList.add('d-none'), duration);
         }
+    }
+
+    limpiarResaltadoDemo() {
+        const z1 = document.getElementById('joystick-zone');
+        const k1 = document.getElementById('joystick-knob');
+        const z2 = document.getElementById('joystick-zone-arm');
+        const k2 = document.getElementById('joystick-knob-arm');
+        if (z1) delete z1.dataset.dir;
+        if (k1) { k1.classList.add('returning'); k1.style.transform = 'translate(0px, 0px)'; }
+        if (z2) delete z2.dataset.dir;
+        if (k2) { k2.classList.add('returning'); k2.style.transform = 'translate(0px, 0px)'; }
+        document.querySelectorAll('.cmd-btn.sent').forEach(b => b.classList.remove('sent'));
+    }
+
+    resaltarMovimientoDemo(nombreComando) {
+        this.limpiarResaltadoDemo();
+        const norm = normalizar(String(nombreComando || ''));
+        if (!norm || norm === 'DETENER' || norm === 'STOP') return;
+
+        const offset = 22;
+        const mapaJoy1 = {
+            'AVANZAR':         { dir: 'ADELANTE',  dx: 0,       dy: -offset },
+            'ADELANTE':        { dir: 'ADELANTE',  dx: 0,       dy: -offset },
+            'RETROCEDER':      { dir: 'ATRAS',     dx: 0,       dy: offset },
+            'ATRAS':           { dir: 'ATRAS',     dx: 0,       dy: offset },
+            'GIRAR_IZQUIERDA': { dir: 'IZQUIERDA', dx: -offset, dy: 0 },
+            'IZQUIERDA':       { dir: 'IZQUIERDA', dx: -offset, dy: 0 },
+            'GIRAR_DERECHA':   { dir: 'DERECHA',   dx: offset,  dy: 0 },
+            'DERECHA':         { dir: 'DERECHA',   dx: offset,  dy: 0 }
+        };
+        const mapaJoy2 = {
+            'SUBIR_BRAZO':     { dir: 'ADELANTE',  dx: 0,       dy: -offset },
+            'BAJAR_BRAZO':     { dir: 'ATRAS',     dx: 0,       dy: offset },
+            'MOTOR_IZQUIERDA': { dir: 'IZQUIERDA', dx: -offset, dy: 0 },
+            'MOTOR_DERECHA':   { dir: 'DERECHA',   dx: offset,  dy: 0 }
+        };
+
+        if (mapaJoy1[norm]) {
+            const z = document.getElementById('joystick-zone');
+            const k = document.getElementById('joystick-knob');
+            if (z) z.dataset.dir = mapaJoy1[norm].dir;
+            if (k) {
+                k.classList.add('returning');
+                k.style.transform = `translate(${mapaJoy1[norm].dx}px, ${mapaJoy1[norm].dy}px)`;
+            }
+            return;
+        }
+        if (mapaJoy2[norm]) {
+            const z = document.getElementById('joystick-zone-arm');
+            const k = document.getElementById('joystick-knob-arm');
+            if (z) z.dataset.dir = mapaJoy2[norm].dir;
+            if (k) {
+                k.classList.add('returning');
+                k.style.transform = `translate(${mapaJoy2[norm].dx}px, ${mapaJoy2[norm].dy}px)`;
+            }
+            return;
+        }
+
+        // Si es un accesorio, resaltar su botón
+        document.querySelectorAll('.cmd-btn').forEach(btn => {
+            if (normalizar(btn.textContent || '') === norm) {
+                btn.classList.add('sent');
+                setTimeout(() => btn.classList.remove('sent'), 600);
+            }
+        });
     }
 
     renderComandos(comandos, onCommandClick) {

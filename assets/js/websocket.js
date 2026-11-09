@@ -1,4 +1,4 @@
-// js/websocket.js
+// assets/js/websocket.js
 import { CONFIG } from './config.js';
 import { ui } from './ui.js';
 
@@ -7,6 +7,11 @@ class WebSocketManager {
         this.ws = null;
         this.reconnectAttempts = 0;
         this.maxAttempts = 5;
+        this.onMessageCallback = null;
+    }
+
+    setOnMessage(callback) {
+        this.onMessageCallback = callback;
     }
 
     connect() {
@@ -25,8 +30,14 @@ class WebSocketManager {
                 try {
                     const data = JSON.parse(event.data);
                     console.log('Evento WSS recibido:', data);
+                    if (this.onMessageCallback) {
+                        this.onMessageCallback(data);
+                    }
                 } catch (e) {
-                    console.error('Error parseando JSON del WSS', e);
+                    console.log('Mensaje WSS texto:', event.data);
+                    if (this.onMessageCallback && event.data) {
+                        this.onMessageCallback({ rawText: String(event.data) });
+                    }
                 }
             };
 
@@ -38,7 +49,7 @@ class WebSocketManager {
 
             this.ws.onerror = (error) => {
                 console.error('WSS Error:', error);
-                if(this.ws.readyState === 1) {
+                if (this.ws && this.ws.readyState === 1) {
                     this.ws.close();
                 }
             };
