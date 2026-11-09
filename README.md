@@ -34,18 +34,18 @@ vehiculo-iot-frontend/
 ├── assets/
 │   ├── Favicon_Iot_vehiculo.png  # Icono circular con fondo transparente (pestaña y encabezado)
 │   ├── Favicon_Iot_vehiculo.jpg  # Imagen fuente original del icono
-│   └── favicon.ico               # Icono estándar para navegadores
-├── css/
-│   └── styles.css                # Estilos responsivos (1 sola pantalla en móvil), joysticks tipo dial y tema espacial
-├── data/
-│   └── .gitkeep                  # Directorio reservado para catálogos estáticos futuros
-├── js/
-│   ├── config.js                 # Constantes globales (URLs de API REST, WSS e ID del vehículo)
-│   ├── api.js                    # Cliente HTTP (Fetch + AbortController) hacia AWS
-│   ├── websocket.js              # Gestión de conexión y reconexión automática de WebSockets
-│   ├── joystick.js               # Clase Joystick: trigonometría, zona muerta, límites y retorno al centro
-│   ├── ui.js                     # Control del DOM, fondo espacial Canvas 2D, sonidos Web Audio API y modo offline
-│   └── app.js                    # Orquestador principal, verificación de RDS, reintentos y enlace de eventos
+│   ├── favicon.ico               # Icono estándar para navegadores
+│   ├── css/
+│   │   └── styles.css            # Estilos responsivos (1 sola pantalla en móvil), joysticks tipo dial y tema espacial
+│   ├── data/
+│   │   └── .gitkeep              # Directorio reservado para catálogos estáticos futuros
+│   └── js/
+│       ├── config.js             # Constantes globales (URLs de API REST, WSS e ID del vehículo)
+│       ├── api.js                # Cliente HTTP (Fetch + AbortController) hacia AWS
+│       ├── websocket.js          # Gestión de conexión y reconexión automática de WebSockets
+│       ├── joystick.js           # Clase Joystick: trigonometría, zona muerta, límites y retorno al centro
+│       ├── ui.js                 # Control del DOM, fondo espacial Canvas 2D, sonidos Web Audio API y modo offline
+│       └── app.js                # Orquestador principal, verificación de RDS, reintentos y enlace de eventos
 ├── index.html                    # Estructura principal, panel de conectividad, doble joystick, accesorios y demos
 └── README.md                     # Documentación técnica del proyecto
 ```
