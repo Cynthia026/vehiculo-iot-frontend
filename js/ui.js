@@ -143,6 +143,8 @@ class UIController {
 
         resize();
         window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+        window.visualViewport?.addEventListener('resize', resize);
 
         const spawnShootingStar = () => {
             if (shootingStars.length < 2 && Math.random() < 0.012) {

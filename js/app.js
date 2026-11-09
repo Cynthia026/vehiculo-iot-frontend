@@ -25,6 +25,13 @@ function inicializar() {
 
 // Los eventos se enlazan una sola vez, aunque AWS esté apagado
 function configurarControles() {
+    // Bloquear desplazamiento de la pantalla al arrastrar en móviles (vertical u horizontal)
+    document.addEventListener('touchmove', (e) => {
+        if (!e.target.closest('select')) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
     document.getElementById('btn-stop').addEventListener('click', () => {
         ui.playSound('stop');
         ui.vibrar(25);
