@@ -1,6 +1,6 @@
 // assets/js/api.js
-import { CONFIG } from './config.js?v=8';
-import { ui } from './ui.js?v=8';
+import { CONFIG } from './config.js?v=9';
+import { ui } from './ui.js?v=9';
 
 class ApiClient {
     constructor() {
@@ -49,7 +49,7 @@ class ApiClient {
         }
     }
 
-    // -- Métodos de Dominio --
+    // --- MÉTODOS DE CONTROL ---
 
     async obtenerComandos() {
         return this.get(`/api/comandos/vehiculo/${CONFIG.VEHICULO_ID}`);
@@ -68,14 +68,11 @@ class ApiClient {
     }
 
     async ejecutarDemo(idDemo) {
-        // Añadimos el id_vehiculo como query parameter (ej. ?id_vehiculo=1)
         const url = `${CONFIG.API_BASE_URL}/api/demos/${idDemo}/ejecutar?id_vehiculo=${CONFIG.VEHICULO_ID}`;
-        
         const response = await fetch(url, { 
             method: 'POST',
             headers: { 'Accept': 'application/json' }
         });
-        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -84,6 +81,23 @@ class ApiClient {
 
     async cancelarDemo() {
         return await fetch(`${CONFIG.API_BASE_URL}/api/demos/vehiculo/${CONFIG.VEHICULO_ID}/cancelar`, { method: 'POST' });
+    }
+
+    // --- MÉTODOS DE MONITOREO (Práctica 4.2) ---
+
+    async obtenerUltimoEstado() {
+        // Usa el GET real documentado en Swagger
+        return this.get(`/api/telemetria/estado/${CONFIG.VEHICULO_ID}`);
+    }
+
+    async obtenerHistorial() {
+        // Usa el GET real documentado, trae los últimos registros
+        const historial = await this.get(`/api/telemetria/historial/${CONFIG.VEHICULO_ID}`);
+        const lista = Array.isArray(historial)
+            ? historial
+            : (historial?.historial || historial?.datos || historial?.data || []);
+        // Retornamos máximo 10 según la regla de negocio
+        return Array.isArray(lista) ? lista.slice(0, 10) : [];
     }
 }
 

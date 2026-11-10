@@ -1,4 +1,4 @@
-// js/ui.js
+// assets/js/ui.js
 const ICONOS = [
     [/SONIDO|AUDIO|VOLUM/, 'volume-up-fill'],
     [/MOTOR/, 'gear-fill'],
@@ -11,17 +11,18 @@ const ICONOS = [
 ];
 
 // Normaliza nombres: sin acentos, mayúsculas y con guion bajo ("Subir brazo" -> SUBIR_BRAZO)
-export const normalizar = (n) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/[\s-]+/g, '_');
+export const normalizar = (n) => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/[\s-]+/g, '_');
 
 const iconoPara = (nombre) => {
-    const hit = ICONOS.find(([re]) => re.test(nombre.toUpperCase()));
+    const hit = ICONOS.find(([re]) => re.test(String(nombre || '').toUpperCase()));
     return hit ? hit[1] : 'lightning-charge-fill';
 };
 
 const etiqueta = (nombre) => {
-    const t = nombre.replace(/_/g, ' ').toLowerCase();
+    const t = String(nombre || '').replace(/_/g, ' ').toLowerCase();
     return t.charAt(0).toUpperCase() + t.slice(1);
 };
+
 // Accesorios que se muestran (deshabilitados) mientras AWS no responde
 const ACCESORIOS_BASE = ['Velocidad', 'Sonido', 'Luz'];
 
@@ -32,9 +33,142 @@ class UIController {
         this.statusAws = document.getElementById('status-aws');
         this._timer = null;
         this._audioCtx = null;
+        this.onSwitchToMonitoreo = null;
         this.initSpaceBackground();
     }
 
+    // --- NAVEGACIÓN DE VISTAS (Control / Monitoreo) ---
+    switchView(viewName) {
+        this.playSound('tap');
+        this.vibrar(10);
+
+        const vistaControl = document.getElementById('vista-control');
+        const vistaMonitoreo = document.getElementById('vista-monitoreo');
+        const btnControl = document.getElementById('btn-tab-control');
+        const btnMonitoreo = document.getElementById('btn-tab-monitoreo');
+
+        if (!vistaControl || !vistaMonitoreo) return;
+
+        if (viewName === 'control') {
+            vistaControl.classList.remove('d-none');
+            vistaMonitoreo.classList.add('d-none');
+            btnControl?.classList.add('active');
+            btnMonitoreo?.classList.remove('active');
+        } else {
+            vistaControl.classList.add('d-none');
+            vistaMonitoreo.classList.remove('d-none');
+            btnControl?.classList.remove('active');
+            btnMonitoreo?.classList.add('active');
+            if (this.onSwitchToMonitoreo) {
+                this.onSwitchToMonitoreo();
+            }
+        }
+    }
+
+    // --- FORMATO FECHAS (DD/MM/YYYY y HH:MM:SS) ---
+    formatearFechaHora(fechaIso) {
+        if (!fechaIso) return { fecha: '--/--/----', hora: '--:--:--' };
+        const date = new Date(fechaIso);
+        if (isNaN(date.getTime())) return { fecha: '--/--/----', hora: '--:--:--' };
+
+        const dia = String(date.getDate()).padStart(2, '0');
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const anio = date.getFullYear();
+        const horas = String(date.getHours()).padStart(2, '0');
+        const minutos = String(date.getMinutes()).padStart(2, '0');
+        const segundos = String(date.getSeconds()).padStart(2, '0');
+        return {
+            fecha: `${dia}/${mes}/${anio}`,
+            hora: `${horas}:${minutos}:${segundos}`
+        };
+    }
+
+    // Icono y tema de color según el nombre del movimiento
+    _configVisualMovimiento(comandoStr) {
+        const norm = normalizar(comandoStr);
+        if (norm === 'DETENER' || norm === 'STOP') {
+            return { icon: 'bi-stop-circle-fill', stateClass: 'state-danger' };
+        }
+        if (norm.includes('RETROCEDER') || norm.includes('ATRAS') || norm.includes('BAJAR')) {
+            return { icon: 'bi-arrow-down-circle-fill', stateClass: 'state-warn' };
+        }
+        if (norm.includes('IZQUIERDA')) {
+            return { icon: 'bi-arrow-left-circle-fill', stateClass: 'state-info' };
+        }
+        if (norm.includes('DERECHA')) {
+            return { icon: 'bi-arrow-right-circle-fill', stateClass: 'state-info' };
+        }
+        if (norm.includes('SUBIR')) {
+            return { icon: 'bi-arrow-up-circle-fill', stateClass: 'state-info' };
+        }
+        if (norm.includes('VELOC')) {
+            return { icon: 'bi-speedometer2', stateClass: 'state-warn' };
+        }
+        if (norm.includes('SONIDO') || norm.includes('CLAXON')) {
+            return { icon: 'bi-volume-up-fill', stateClass: 'state-info' };
+        }
+        if (norm.includes('LUZ')) {
+            return { icon: 'bi-lightbulb-fill', stateClass: 'state-ok' };
+        }
+        return { icon: 'bi-arrow-up-circle-fill', stateClass: 'state-ok' };
+    }
+
+    // --- RENDERIZADO MONITOREO ---
+    renderUltimoEstado(datos) {
+        if (!datos) return;
+        const item = Array.isArray(datos) ? datos[0] : (datos.datos || datos);
+        if (!item) return;
+
+        const nombreCmd = item.comando || item.nombre_comando || item.nombre || item.movimiento || 'Sin registro';
+        const fechaRaw = item.fecha_actualizacion || item.fecha_hora || item.fecha || item.timestamp || item.created_at;
+        const { fecha, hora } = this.formatearFechaHora(fechaRaw);
+
+        const cmdEl = document.getElementById('monitoreo-comando');
+        const fechaEl = document.getElementById('monitoreo-fecha');
+        const horaEl = document.getElementById('monitoreo-hora');
+        const iconEl = document.getElementById('monitoreo-icono');
+        const cardEl = document.getElementById('monitoreo-card');
+
+        if (cmdEl) cmdEl.textContent = nombreCmd;
+        if (fechaEl) fechaEl.textContent = `Fecha: ${fecha}`;
+        if (horaEl) horaEl.textContent = `Hora: ${hora}`;
+
+        const { icon, stateClass } = this._configVisualMovimiento(nombreCmd);
+        if (iconEl) iconEl.innerHTML = `<i class="bi ${icon}"></i>`;
+        if (cardEl) {
+            cardEl.classList.remove('state-ok', 'state-danger', 'state-warn', 'state-info');
+            cardEl.classList.add(stateClass);
+        }
+    }
+
+    renderHistorial(registros) {
+        const tbody = document.getElementById('tabla-historial');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!registros || registros.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="monitor-empty">Sin registros de movimientos</td></tr>';
+            return;
+        }
+
+        registros.slice(0, 10).forEach((reg, index) => {
+            const tr = document.createElement('tr');
+            const nombreCmd = reg.comando || reg.nombre_comando || reg.nombre || reg.movimiento || 'Desconocido';
+            const fechaRaw = reg.fecha_hora || reg.fecha_actualizacion || reg.fecha || reg.timestamp || reg.created_at;
+            const { fecha, hora } = this.formatearFechaHora(fechaRaw);
+            const { icon } = this._configVisualMovimiento(nombreCmd);
+
+            tr.innerHTML = `
+                <td><span class="monitor-row-num">${index + 1}</span></td>
+                <td><span class="monitor-cmd-badge"><i class="bi ${icon}"></i> ${nombreCmd}</span></td>
+                <td>${fecha}</td>
+                <td>${hora}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- SONIDOS WEB AUDIO API ---
     _getAudioCtx() {
         if (!this._audioCtx) {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -70,32 +204,24 @@ class UIController {
             };
 
             if (tipo === 'stop') {
-                // Tono descendente de freno / parada
                 tone(440, 180, 0.22, 'triangle', 0.2);
                 tone(320, 130, 0.22, 'sawtooth', 0.08);
             } else if (tipo === 'start') {
-                // Doble nota ascendente de inicio
                 tone(523.25, 523.25, 0.1, 'sine', 0.16, 0);
                 tone(659.25, 783.99, 0.18, 'sine', 0.18, 0.09);
             } else if (tipo === 'cancel') {
-                // Doble nota descendente de cancelación
                 tone(520, 440, 0.1, 'triangle', 0.15, 0);
                 tone(380, 260, 0.18, 'triangle', 0.15, 0.09);
             } else if (tipo === 'horn') {
-                // Claxon / sonido
                 tone(480, 480, 0.2, 'sawtooth', 0.12, 0);
                 tone(600, 600, 0.2, 'triangle', 0.14, 0);
             } else if (tipo === 'speed') {
-                // Aceleración / velocidad
                 tone(320, 880, 0.18, 'sine', 0.16, 0);
             } else if (tipo === 'light') {
-                // Interruptor de luz
                 tone(880, 1174, 0.1, 'sine', 0.14, 0);
             } else if (tipo === 'joy') {
-                // Pulso suave al mover el joystick
                 tone(420, 560, 0.06, 'sine', 0.09, 0);
             } else {
-                // Clic futurista estándar
                 tone(620, 820, 0.08, 'sine', 0.14, 0);
             }
         } catch (e) {
@@ -103,6 +229,7 @@ class UIController {
         }
     }
 
+    // --- FONDO ESPACIAL EN MOVIMIENTO ---
     initSpaceBackground() {
         const canvas = document.getElementById('space-bg');
         if (!canvas) return;
@@ -166,7 +293,6 @@ class UIController {
         const animate = () => {
             ctx.clearRect(0, 0, w, h);
 
-            // Nebulosas suaves en movimiento
             for (const n of nebulae) {
                 n.x += n.vx;
                 n.y += n.vy;
@@ -182,7 +308,6 @@ class UIController {
                 ctx.fill();
             }
 
-            // Estrellas con movimiento de paralaje y centelleo
             for (const s of stars) {
                 s.x += s.vx;
                 s.y += s.vy;
@@ -210,7 +335,6 @@ class UIController {
             }
             ctx.globalAlpha = 1;
 
-            // Estrellas fugaces ocasionales
             spawnShootingStar();
             for (let i = shootingStars.length - 1; i >= 0; i--) {
                 const st = shootingStars[i];
@@ -277,7 +401,6 @@ class UIController {
         this.feedback.textContent = message;
         this.feedback.className = `alert alert-${type}`;
 
-        // Ocultar después del tiempo indicado si no es un error
         if (type !== 'danger' && duration > 0) {
             this._timer = setTimeout(() => this.feedback.classList.add('d-none'), duration);
         }
@@ -339,7 +462,6 @@ class UIController {
             return;
         }
 
-        // Si es un accesorio, resaltar su botón
         document.querySelectorAll('.cmd-btn').forEach(btn => {
             if (normalizar(btn.textContent || '') === norm) {
                 btn.classList.add('sent');
@@ -350,14 +472,13 @@ class UIController {
 
     renderComandos(comandos, onCommandClick) {
         const container = document.getElementById('extra-commands-container');
-        container.innerHTML = ''; // Limpiar
+        container.innerHTML = '';
 
         const btnStop = document.getElementById('btn-stop');
         if (btnStop) btnStop.disabled = false;
         
-        // Excluimos los comandos que ya controla el joystick y el botón rojo
         const excluidos = ['AVANZAR', 'RETROCEDER', 'GIRAR_IZQUIERDA', 'GIRAR_DERECHA', 'DETENER', 'STOP',
-                          'SUBIR_BRAZO', 'BAJAR_BRAZO', 'MOTOR_IZQUIERDA', 'MOTOR_DERECHA']; // los controlan los joysticks
+                          'SUBIR_BRAZO', 'BAJAR_BRAZO', 'MOTOR_IZQUIERDA', 'MOTOR_DERECHA'];
         
         comandos.forEach(cmd => {
             const nombreCmd = cmd.nombre || cmd.comando;
@@ -395,7 +516,6 @@ class UIController {
         });
     }
 
-    // Modo sin conexión: todo visible pero opaco y sin interacción
     setOffline(off) {
         document.body.classList.toggle('is-offline', off);
         const stop = document.getElementById('btn-stop');
@@ -427,3 +547,4 @@ class UIController {
 
 export const ui = new UIController();
 export const UI = ui;
+window.ui = ui;

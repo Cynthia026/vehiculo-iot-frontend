@@ -1,13 +1,14 @@
 // assets/js/app.js
-import { api } from './api.js?v=8';
-import { wsManager } from './websocket.js?v=8';
-import { ui, normalizar } from './ui.js?v=8';
-import { Joystick } from './joystick.js?v=8';
-import { CONFIG } from './config.js?v=8'; // Importado para acceder a la URL base
+import { api } from './api.js?v=9';
+import { wsManager } from './websocket.js?v=9';
+import { ui, normalizar } from './ui.js?v=9';
+import { Joystick } from './joystick.js?v=9';
+import { CONFIG } from './config.js?v=9';
 
 let catalogoComandos = [];
 let catalogoDemos = [];
 let idComandoDetener = null;
+let historialLocal = [];
 
 let reintentoTimer = null;
 let primerFallo = true;
@@ -32,6 +33,7 @@ function inicializar() {
     // 1. Mostrar toda la interfaz de inmediato, deshabilitada hasta que AWS responda
     ui.renderComandosPlaceholder();
     ui.setOffline(true);
+    ui.onSwitchToMonitoreo = () => cargarMonitoreo();
     configurarControles();
 
     // 2. Conexiones
@@ -43,9 +45,9 @@ function inicializar() {
 
 // Los eventos se enlazan una sola vez, aunque AWS esté apagado
 function configurarControles() {
-    // Bloquear desplazamiento de la pantalla al arrastrar en móviles (vertical u horizontal)
+    // Bloquear desplazamiento de la pantalla en vista Control al arrastrar en móviles
     document.addEventListener('touchmove', (e) => {
-        if (!e.target.closest('select')) {
+        if (!e.target.closest('select, .monitor-table-container')) {
             e.preventDefault();
         }
     }, { passive: false });
@@ -119,8 +121,26 @@ function obtenerNombreComando(valor) {
     return null;
 }
 
+// Actualiza de forma instantánea la vista de Monitoreo cuando ocurre un evento WSS y luego sincroniza con RDS
+function registrarMovimientoEnMonitoreo(nombreMovimiento, fechaIso = null) {
+    if (!nombreMovimiento) return;
+    const ahora = fechaIso || new Date().toISOString();
+    const nuevoRegistro = {
+        comando: nombreMovimiento,
+        fecha_hora: ahora,
+        fecha_actualizacion: ahora
+    };
+
+    ui.renderUltimoEstado(nuevoRegistro);
+    historialLocal = [nuevoRegistro, ...historialLocal].slice(0, 10);
+    ui.renderHistorial(historialLocal);
+
+    // Sincronizar con los datos persistidos en RDS
+    cargarMonitoreo();
+}
+
 // Muestra en el aviso inferior y en los joysticks el movimiento en ejecución
-function mostrarPasoDemo(nombreMovimiento) {
+function mostrarPasoDemo(nombreMovimiento, fechaIso = null) {
     if (!nombreMovimiento) return;
     const limpio = String(nombreMovimiento).trim();
     if (!limpio) return;
@@ -135,6 +155,8 @@ function mostrarPasoDemo(nombreMovimiento) {
         ui.resaltarMovimientoDemo(limpio);
         ui.showFeedback(`Enviando: ${limpio}`, 'info', 4000);
     }
+
+    registrarMovimientoEnMonitoreo(limpio, fechaIso);
 }
 
 // Procesa los eventos en tiempo real enviados por el WebSocket (/api/demos/ws/1)
@@ -153,7 +175,7 @@ function manejarEventoWssDemo(data) {
     if (tipoEvento === 'movimiento_demo' || data.comando_en_ejecucion != null) {
         const idONombre = data.comando_en_ejecucion ?? data.id_comando ?? data.datos?.id_comando ?? data.datos?.comando;
         const nombreMov = obtenerNombreComando(idONombre) || `Paso ${data.orden || ''}`.trim();
-        mostrarPasoDemo(nombreMov);
+        mostrarPasoDemo(nombreMov, data.fecha_hora || data.datos?.fecha_hora);
         return;
     }
 
@@ -161,6 +183,7 @@ function manejarEventoWssDemo(data) {
     if (tipoEvento === 'cancelacion_demo' || /cancel/i.test(tipoEvento)) {
         ui.limpiarResaltadoDemo();
         ui.showFeedback('DEMO cancelada', 'warning', 2500);
+        cargarMonitoreo();
         return;
     }
 
@@ -168,6 +191,7 @@ function manejarEventoWssDemo(data) {
     if (/fin_demo|finaliz|complet|terminad/i.test(tipoEvento)) {
         ui.limpiarResaltadoDemo();
         ui.showFeedback('DEMO finalizada', 'success', 2500);
+        cargarMonitoreo();
         return;
     }
 
@@ -176,6 +200,7 @@ function manejarEventoWssDemo(data) {
         const nombreMov = data.datos.comando || obtenerNombreComando(data.datos.id_comando);
         if (nombreMov) {
             ui.showFeedback(`Enviando: ${nombreMov}`, 'info', 2000);
+            registrarMovimientoEnMonitoreo(nombreMov, data.datos.fecha_hora || data.datos.fecha_actualizacion);
         }
         return;
     }
@@ -183,7 +208,45 @@ function manejarEventoWssDemo(data) {
     // 6. Cualquier otro formato que traiga id_comando o comando
     const otroComando = obtenerNombreComando(data.id_comando ?? data.datos?.comando ?? data.datos?.id_comando ?? data.comando ?? data.movimiento);
     if (otroComando) {
-        mostrarPasoDemo(otroComando);
+        mostrarPasoDemo(otroComando, data.fecha_hora || data.datos?.fecha_hora);
+    }
+}
+
+// Consulta el último estado y los últimos 10 movimientos desde la API (RDS)
+async function cargarMonitoreo() {
+    try {
+        const [resEstado, resHistorial] = await Promise.allSettled([
+            api.obtenerUltimoEstado(),
+            api.obtenerHistorial()
+        ]);
+
+        if (resHistorial.status === 'fulfilled' && Array.isArray(resHistorial.value)) {
+            historialLocal = resHistorial.value.map(reg => ({
+                ...reg,
+                comando: reg.comando || reg.nombre_comando || obtenerNombreComando(reg.id_comando) || 'Desconocido'
+            }));
+            ui.renderHistorial(historialLocal);
+        }
+
+        if (resEstado.status === 'fulfilled' && resEstado.value) {
+            const est = Array.isArray(resEstado.value) ? resEstado.value[0] : (resEstado.value.datos || resEstado.value);
+            if (est) {
+                const comandoNombre = est.comando || est.nombre_comando || obtenerNombreComando(est.id_comando) || historialLocal[0]?.comando;
+                const fechaValor = est.fecha_actualizacion || est.fecha_hora || est.fecha || historialLocal[0]?.fecha_hora;
+                ui.renderUltimoEstado({
+                    ...est,
+                    comando: comandoNombre,
+                    fecha_actualizacion: fechaValor
+                });
+                return;
+            }
+        }
+
+        if (historialLocal.length > 0) {
+            ui.renderUltimoEstado(historialLocal[0]);
+        }
+    } catch (error) {
+        console.error('Error cargando monitoreo:', error);
     }
 }
 
@@ -206,6 +269,9 @@ async function cargarDatos() {
 
         primerFallo = true;
         document.getElementById('action-feedback').classList.add('d-none');
+
+        // Cargar estado e historial inicial de Monitoreo
+        cargarMonitoreo();
     } catch (error) {
         console.error('Error cargando datos:', error);
         if (primerFallo) {
@@ -243,7 +309,6 @@ async function verificarRDS() {
 }
 
 async function manejarMovimientoJoystick(direccion) {
-    // Mapeamos la salida del joystick a los nombres reales de la API
     const mapDirecciones = {
         'ADELANTE': 'AVANZAR',
         'ATRAS': 'RETROCEDER',
@@ -275,6 +340,7 @@ async function ejecutarComando(idComando, nombreComando) {
     try {
         ui.showFeedback(`Enviando: ${nombreComando}`);
         await api.ejecutarMovimiento(idComando);
+        cargarMonitoreo();
     } catch (error) {
         // El error ya lo maneja api.js
     }

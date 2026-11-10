@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#0d1220">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Control IoT - Vehículo</title>
+    <title>Control y Monitoreo IoT - Vehículo</title>
 
-    <link rel="icon" type="image/png" href="assets/Favicon_Iot_vehiculo.png?v=3">
-    <link rel="apple-touch-icon" href="assets/Favicon_Iot_vehiculo.png?v=3">
+    <link rel="icon" type="image/png" href="assets/Favicon_Iot_vehiculo.png?v=9">
+    <link rel="apple-touch-icon" href="assets/Favicon_Iot_vehiculo.png?v=9">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,14 +17,14 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <link rel="stylesheet" href="assets/css/styles.css?v=8">
+    <link rel="stylesheet" href="assets/css/styles.css?v=9">
 </head>
 <body>
 
     <!-- Fondo astronómico animado -->
     <canvas id="space-bg" class="space-bg" aria-hidden="true"></canvas>
 
-    <!-- Encabezado: título y estado de conectividad -->
+    <!-- Encabezado: título, pestañas de navegación y estado de conectividad -->
     <header class="app-header">
         <div class="app-title">
             <img class="app-title-icon" src="assets/Favicon_Iot_vehiculo.png" alt="Logo Vehículo IoT">
@@ -33,7 +33,18 @@
                 <small>Unidad 1</small>
             </div>
         </div>
-        <div class="status-group">
+
+        <!-- Navegación de vistas: Control / Monitoreo -->
+        <nav class="app-tabs" id="appTabs" aria-label="Navegación de vistas">
+            <button type="button" class="app-tab active" id="btn-tab-control" onclick="ui.switchView('control')">
+                <i class="bi bi-controller"></i> Control
+            </button>
+            <button type="button" class="app-tab" id="btn-tab-monitoreo" onclick="ui.switchView('monitoreo')">
+                <i class="bi bi-activity"></i> Monitoreo
+            </button>
+        </nav>
+
+        <div class="status-group" id="status-panel">
             <div id="status-wss" class="badge bg-secondary status-badge" title="Estado del WebSocket">
                 <i class="bi bi-broadcast"></i> WSS: Desconectado
             </div>
@@ -50,71 +61,126 @@
 
         <div id="action-feedback" class="alert alert-info d-none" role="alert">Iniciando...</div>
 
-        <!-- Panel de conducción -->
-        <section class="panel drive-panel" aria-label="Controles de conducción">
-            <div class="pad-row">
-                <div class="pad">
-                    <h2 class="pad-title">Movimiento</h2>
-                    <div id="joystick-zone" class="joystick-zone" role="application" aria-label="Joystick de movimiento">
-                        <span class="jz-mark jz-up"><i class="bi bi-chevron-up"></i></span>
+        <!-- ================= VISTA CONTROL (Práctica 4.1) ================= -->
+        <div id="vista-control" class="vista-control">
+            <!-- Panel de conducción -->
+            <section class="panel drive-panel" aria-label="Controles de conducción">
+                <div class="pad-row">
+                    <div class="pad">
+                        <h2 class="pad-title">Movimiento</h2>
+                        <div id="joystick-zone" class="joystick-zone" role="application" aria-label="Joystick de movimiento">
+                            <span class="jz-mark jz-up"><i class="bi bi-chevron-up"></i></span>
                             <span class="jz-mark jz-down"><i class="bi bi-chevron-down"></i></span>
                             <span class="jz-mark jz-left"><i class="bi bi-chevron-left"></i></span>
                             <span class="jz-mark jz-right"><i class="bi bi-chevron-right"></i></span>
-                        <div id="joystick-knob" class="joystick-knob"><i class="bi bi-arrows-move"></i></div>
+                            <div id="joystick-knob" class="joystick-knob"><i class="bi bi-arrows-move"></i></div>
+                        </div>
+                        <p class="pad-hint">Avanzar · Retroceder · Girar</p>
                     </div>
-                    <p class="pad-hint">Avanzar · Retroceder · Girar</p>
-                </div>
-                <div class="pad">
-                    <h2 class="pad-title">Brazo y motores</h2>
-                    <div id="joystick-zone-arm" class="joystick-zone joystick-alt" role="application" aria-label="Joystick de brazo y motores">
-                        <span class="jz-mark jz-up"><i class="bi bi-arrow-bar-up"></i></span>
+                    <div class="pad">
+                        <h2 class="pad-title">Brazo y motores</h2>
+                        <div id="joystick-zone-arm" class="joystick-zone joystick-alt" role="application" aria-label="Joystick de brazo y motores">
+                            <span class="jz-mark jz-up"><i class="bi bi-arrow-bar-up"></i></span>
                             <span class="jz-mark jz-down"><i class="bi bi-arrow-bar-down"></i></span>
                             <span class="jz-mark jz-left"><i class="bi bi-arrow-counterclockwise"></i></span>
                             <span class="jz-mark jz-right"><i class="bi bi-arrow-clockwise"></i></span>
-                        <div id="joystick-knob-arm" class="joystick-knob"><i class="bi bi-gear-wide-connected"></i></div>
+                            <div id="joystick-knob-arm" class="joystick-knob"><i class="bi bi-gear-wide-connected"></i></div>
+                        </div>
+                        <p class="pad-hint">Brazo ↕ · Motores ↔</p>
                     </div>
-                    <p class="pad-hint">Brazo ↕ · Motores ↔</p>
                 </div>
-            </div>
-            <button id="btn-stop" class="btn-stop" disabled>
-                <i class="bi bi-sign-stop-fill"></i> Detener
-            </button>
-        </section>
+                <button id="btn-stop" class="btn-stop" disabled>
+                    <i class="bi bi-sign-stop-fill"></i> Detener
+                </button>
+            </section>
 
-        <!-- Comandos y secuencias -->
-        <div class="side-column">
-            <section class="panel" aria-label="Accesorios">
-                <h2 class="panel-title"><i class="bi bi-sliders2"></i> Accesorios</h2>
-                <div id="extra-commands-container" class="commands-grid">
-                    <div class="commands-loading" id="cmds-loading">Conectando con AWS...</div>
+            <!-- Comandos y secuencias -->
+            <div class="side-column">
+                <section class="panel" aria-label="Accesorios">
+                    <h2 class="panel-title"><i class="bi bi-sliders2"></i> Accesorios</h2>
+                    <div id="extra-commands-container" class="commands-grid">
+                        <div class="commands-loading" id="cmds-loading">Conectando con AWS...</div>
+                    </div>
+                </section>
+
+                <section class="panel" aria-label="Secuencias demo">
+                    <h2 class="panel-title"><i class="bi bi-play-circle-fill"></i> Secuencias demo</h2>
+                    <p class="demo-caption">Ejecuta una rutina automática del vehículo.</p>
+                    <div class="demo-picker">
+                        <i class="bi bi-collection-play"></i>
+                        <select id="demo-select" class="form-select demo-select" aria-label="Seleccionar demo">
+                            <option value="" selected>Cargando demos...</option>
+                        </select>
+                    </div>
+                    <div class="demo-actions">
+                        <button id="btn-demo-start" class="btn-demo btn-demo-start" disabled>
+                            <i class="bi bi-play-fill"></i> Iniciar
+                        </button>
+                        <button id="btn-demo-cancel" class="btn-demo btn-demo-cancel" disabled>
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- ================= VISTA MONITOREO (Práctica 4.2) ================= -->
+        <div id="vista-monitoreo" class="vista-monitoreo d-none">
+            <!-- Tarjeta Último Movimiento -->
+            <section class="panel monitor-last-card state-ok" id="monitoreo-card" aria-label="Último movimiento">
+                <div class="monitor-last-header" id="monitoreo-header">
+                    <span class="monitor-header-title"><i class="bi bi-activity"></i> Último movimiento</span>
+                    <span class="badge monitor-rds-pill"><i class="bi bi-check-circle-fill"></i> Registrado en RDS</span>
+                </div>
+                <div class="monitor-last-body" id="monitoreo-body">
+                    <div class="monitor-last-left">
+                        <div id="monitoreo-icono" class="monitor-icon-circle">
+                            <i class="bi bi-dash-circle"></i>
+                        </div>
+                        <div class="monitor-last-text">
+                            <h2 id="monitoreo-comando" class="monitor-command-name">Cargando...</h2>
+                            <div class="monitor-datetime">
+                                <span id="monitoreo-fecha">Fecha: --/--/----</span>
+                                <span class="monitor-dot">&bull;</span>
+                                <span id="monitoreo-hora">Hora: --:--:--</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section class="panel" aria-label="Secuencias demo">
-                <h2 class="panel-title"><i class="bi bi-play-circle-fill"></i> Secuencias demo</h2>
-                <p class="demo-caption">Ejecuta una rutina automática del vehículo.</p>
-                <div class="demo-picker">
-                    <i class="bi bi-collection-play"></i>
-                    <select id="demo-select" class="form-select demo-select" aria-label="Seleccionar demo">
-                        <option value="" selected>Cargando demos...</option>
-                    </select>
+            <!-- Tabla de Historial (Últimos 10 movimientos) -->
+            <section class="panel monitor-history-card" aria-label="Últimos 10 movimientos">
+                <div class="monitor-history-header">
+                    <h2 class="panel-title mb-0"><i class="bi bi-table"></i> Últimos 10 movimientos</h2>
+                    <span class="monitor-history-sub">Actualización en tiempo real (WSS + RDS)</span>
                 </div>
-                <div class="demo-actions">
-                    <button id="btn-demo-start" class="btn-demo btn-demo-start" disabled>
-                        <i class="bi bi-play-fill"></i> Iniciar
-                    </button>
-                    <button id="btn-demo-cancel" class="btn-demo btn-demo-cancel" disabled>
-                        <i class="bi bi-x-circle"></i> Cancelar
-                    </button>
+                <div class="monitor-table-container">
+                    <table class="monitor-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Movimiento</th>
+                                <th scope="col">Fecha</th>
+                                <th scope="col">Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial">
+                            <tr>
+                                <td colspan="4" class="monitor-empty">Cargando historial...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </div>
+
     </main>
 
     <footer class="app-footer">
-        Desarrollado por Cynthia Martínez García &middot; 2026
+        Desarrollado por Cynthia Martínez García &middot; 2026 &middot; Control y Monitoreo IoT
     </footer>
 
-    <script type="module" src="assets/js/app.js?v=8"></script>
+    <script type="module" src="assets/js/app.js?v=9"></script>
 </body>
 </html>
