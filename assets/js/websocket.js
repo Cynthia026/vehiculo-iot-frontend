@@ -1,17 +1,17 @@
 // assets/js/websocket.js
-import { CONFIG } from './config.js?v=10';
-import { ui } from './ui.js?v=10';
+import { CONFIG } from './config.js?v=11';
+import { ui } from './ui.js?v=11';
 
 class WebSocketManager {
     constructor() {
         this.ws = null;
         this.reconnectAttempts = 0;
         this.maxAttempts = 5;
-        this.onMessageCallback = null;
+        this.onMessage = null; // Permite avisar a app.js cuando llega un evento WSS
     }
 
     setOnMessage(callback) {
-        this.onMessageCallback = callback;
+        this.onMessage = callback;
     }
 
     connect() {
@@ -30,14 +30,13 @@ class WebSocketManager {
                 try {
                     const data = JSON.parse(event.data);
                     console.log('Evento WSS recibido:', data);
-                    if (this.onMessageCallback) {
-                        this.onMessageCallback(data);
+                    
+                    // Si app.js está escuchando, le pasamos el JSON
+                    if (this.onMessage) {
+                        this.onMessage(data);
                     }
                 } catch (e) {
-                    console.log('Mensaje WSS texto:', event.data);
-                    if (this.onMessageCallback && event.data) {
-                        this.onMessageCallback({ rawText: String(event.data) });
-                    }
+                    console.error('Error parseando JSON del WSS', e);
                 }
             };
 
@@ -64,10 +63,9 @@ class WebSocketManager {
         if (this.reconnectAttempts < this.maxAttempts) {
             this.reconnectAttempts++;
             ui.updateWssStatus(`Reconectando (${this.reconnectAttempts})...`, 'warning');
-            setTimeout(() => this.connect(), 3000); // Intenta cada 3 segundos
+            setTimeout(() => this.connect(), 3000); 
         }
     }
 }
 
-// EXPORTACIÓN EXACTA: app.js espera 'wsManager'
 export const wsManager = new WebSocketManager();

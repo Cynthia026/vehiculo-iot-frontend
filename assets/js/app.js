@@ -1,14 +1,13 @@
 // assets/js/app.js
-import { api } from './api.js?v=10';
-import { wsManager } from './websocket.js?v=10';
-import { ui, normalizar } from './ui.js?v=10';
-import { Joystick } from './joystick.js?v=10';
-import { CONFIG } from './config.js?v=10';
+import { api } from './api.js?v=11';
+import { wsManager } from './websocket.js?v=11';
+import { ui, normalizar } from './ui.js?v=11';
+import { Joystick } from './joystick.js?v=11';
+import { CONFIG } from './config.js?v=11';
 
 let catalogoComandos = [];
-let catalogoDemos = [];
 let idComandoDetener = null;
-let historialLocal = [];
+let vistaActual = 'control'; // Estado para saber qué pestaña estamos viendo
 
 let reintentoTimer = null;
 let primerFallo = true;
@@ -29,29 +28,39 @@ const MAPA_COMANDOS_ID = {
     12: 'Detener'
 };
 
-function inicializar() {
-    // 1. Mostrar toda la interfaz de inmediato, deshabilitada hasta que AWS responda
-    ui.renderComandosPlaceholder();
-    ui.setOffline(true);
-    ui.onSwitchToMonitoreo = () => cargarMonitoreo();
-    configurarControles();
+async function inicializar() {
+    try {
+        // 1. Mostrar interfaz de inmediato (modo offline hasta que AWS responda) y configurar controles
+        ui.renderComandosPlaceholder();
+        ui.setOffline(true);
+        configurarControles();
 
-    // 2. Conexiones
-    wsManager.setOnMessage(manejarEventoWssDemo);
-    wsManager.connect();
-    verificarRDS();
-    cargarDatos();
+        // 2. Conectar WSS y enlazar la escucha de mensajes
+        wsManager.onMessage = procesarMensajeWSS;
+        wsManager.connect();
+
+        // 3. Verificar estado de Amazon RDS
+        await verificarRDS();
+
+        // 4. Cargar Catálogos para Control
+        await cargarCatalogos();
+
+    } catch (error) {
+        console.error('Error en la inicialización:', error);
+        ui.showFeedback('Error de conexión con el servidor AWS', 'danger');
+    }
 }
 
-// Los eventos se enlazan una sola vez, aunque AWS esté apagado
+// Configura los eventos de botones, pestañas y ambos joysticks una sola vez
 function configurarControles() {
-    // Bloquear desplazamiento de la pantalla en vista Control al arrastrar en móviles
+    // Bloquear desplazamiento de la pantalla al arrastrar los joysticks en móviles
     document.addEventListener('touchmove', (e) => {
         if (!e.target.closest('select, .monitor-table-container')) {
             e.preventDefault();
         }
     }, { passive: false });
 
+    // Eventos Botones Control
     document.getElementById('btn-stop').addEventListener('click', () => {
         ui.limpiarResaltadoDemo();
         ui.playSound('stop');
@@ -73,7 +82,7 @@ function configurarControles() {
             ui.limpiarResaltadoDemo();
             ui.playSound('start');
             ui.vibrar(15);
-            ui.showFeedback('Iniciando DEMO...', 'success', 2500);
+            ui.showFeedback('Iniciando DEMO...', 'success');
             await api.ejecutarDemo(select.value);
         } catch (error) {
             ui.limpiarResaltadoDemo();
@@ -86,203 +95,157 @@ function configurarControles() {
         try {
             ui.playSound('cancel');
             ui.vibrar(15);
-            ui.showFeedback('Cancelando DEMO...', 'warning', 2000);
+            ui.showFeedback('Cancelando DEMO...', 'warning');
             await api.cancelarDemo();
         } catch (error) {
             ui.showFeedback('No se pudo cancelar la DEMO', 'danger');
         }
     });
 
+    // Configurar Eventos de Pestañas (Navegación SPA)
+    document.getElementById('btn-tab-control').addEventListener('click', () => {
+        vistaActual = 'control';
+        ui.switchView('control');
+    });
+
+    document.getElementById('btn-tab-monitoreo').addEventListener('click', () => {
+        vistaActual = 'monitoreo';
+        ui.switchView('monitoreo');
+        cargarDatosMonitoreo(); // Hace los GET iniciales al abrir la pestaña
+    });
+
+    // Inicializar Joysticks (Movimiento y Brazo/Motores)
     new Joystick('joystick-zone', 'joystick-knob', (dir) => {
         ui.playSound('joy');
         manejarMovimientoJoystick(dir);
     }, detenerVehiculo);
+
     new Joystick('joystick-zone-arm', 'joystick-knob-arm', (dir) => {
         ui.playSound('joy');
         manejarMovimientoBrazo(dir);
     }, detenerVehiculo);
 }
 
-// Resuelve el nombre del comando a partir de su ID o texto
-function obtenerNombreComando(valor) {
-    if (valor == null) return null;
-
-    // Buscar primero por id_comando en el catálogo cargado desde AWS
-    const porId = catalogoComandos.find(c => String(c.id_comando) === String(valor));
-    if (porId) return porId.nombre || porId.comando;
-
-    // Buscar en el mapa de respaldo si es numérico
-    if (MAPA_COMANDOS_ID[valor]) return MAPA_COMANDOS_ID[valor];
-
-    // Si ya viene como texto (ej. "AVANZAR")
-    if (typeof valor === 'string' && valor.trim().length > 0 && valor !== 'ejecutando_paso') {
-        return valor.trim();
-    }
-    return null;
-}
-
-// Actualiza de forma instantánea la vista de Monitoreo cuando ocurre un evento WSS y luego sincroniza con RDS
-function registrarMovimientoEnMonitoreo(nombreMovimiento, fechaIso = null) {
-    if (!nombreMovimiento) return;
-    const ahora = fechaIso || new Date().toISOString();
-    const nuevoRegistro = {
-        comando: nombreMovimiento,
-        fecha_hora: ahora,
-        fecha_actualizacion: ahora
-    };
-
-    ui.renderUltimoEstado(nuevoRegistro);
-    historialLocal = [nuevoRegistro, ...historialLocal].slice(0, 10);
-    ui.renderHistorial(historialLocal);
-
-    // Sincronizar con los datos persistidos en RDS
-    cargarMonitoreo();
-}
-
-// Muestra en el aviso inferior y en los joysticks el movimiento en ejecución
-function mostrarPasoDemo(nombreMovimiento, fechaIso = null) {
-    if (!nombreMovimiento) return;
-    const limpio = String(nombreMovimiento).trim();
-    if (!limpio) return;
-
-    const norm = normalizar(limpio);
-    if (norm === 'DETENER' || norm === 'STOP') {
-        ui.playSound('stop');
-        ui.limpiarResaltadoDemo();
-        ui.showFeedback(`Enviando: ${limpio}`, 'info', 2500);
-    } else {
-        ui.playSound('joy');
-        ui.resaltarMovimientoDemo(limpio);
-        ui.showFeedback(`Enviando: ${limpio}`, 'info', 4000);
-    }
-
-    registrarMovimientoEnMonitoreo(limpio, fechaIso);
-}
-
-// Procesa los eventos en tiempo real enviados por el WebSocket (/api/demos/ws/1)
-function manejarEventoWssDemo(data) {
-    if (!data) return;
-
-    const tipoEvento = String(data.tipo_evento || data.evento || data.tipo || '').toLowerCase();
-
-    // 1. Inicio de DEMO
-    if (tipoEvento === 'inicio_demo') {
-        ui.showFeedback('Iniciando DEMO...', 'success', 2500);
-        return;
-    }
-
-    // 2. Movimiento de DEMO: { tipo_evento: 'movimiento_demo', vehiculo: 1, comando_en_ejecucion: 1, accion: 'ejecutando_paso', orden: 1 }
-    if (tipoEvento === 'movimiento_demo' || data.comando_en_ejecucion != null) {
-        const idONombre = data.comando_en_ejecucion ?? data.id_comando ?? data.datos?.id_comando ?? data.datos?.comando;
-        const nombreMov = obtenerNombreComando(idONombre) || `Paso ${data.orden || ''}`.trim();
-        mostrarPasoDemo(nombreMov, data.fecha_hora || data.datos?.fecha_hora);
-        return;
-    }
-
-    // 3. Cancelación de DEMO: { tipo_evento: 'cancelacion_demo', vehiculo: 1 }
-    if (tipoEvento === 'cancelacion_demo' || /cancel/i.test(tipoEvento)) {
-        ui.limpiarResaltadoDemo();
-        ui.showFeedback('DEMO cancelada', 'warning', 2500);
-        cargarMonitoreo();
-        return;
-    }
-
-    // 4. Fin de DEMO: { tipo_evento: 'fin_demo', ... }
-    if (/fin_demo|finaliz|complet|terminad/i.test(tipoEvento)) {
-        ui.limpiarResaltadoDemo();
-        ui.showFeedback('DEMO finalizada', 'success', 2500);
-        cargarMonitoreo();
-        return;
-    }
-
-    // 5. Movimiento individual: { tipo_evento: 'movimiento_individual', datos: { id_comando: 5, comando: 'SUBIR_BRAZO' } }
-    if (tipoEvento === 'movimiento_individual' && data.datos) {
-        const nombreMov = data.datos.comando || obtenerNombreComando(data.datos.id_comando);
-        if (nombreMov) {
-            ui.showFeedback(`Enviando: ${nombreMov}`, 'info', 2000);
-            registrarMovimientoEnMonitoreo(nombreMov, data.datos.fecha_hora || data.datos.fecha_actualizacion);
-        }
-        return;
-    }
-
-    // 6. Cualquier otro formato que traiga id_comando o comando
-    const otroComando = obtenerNombreComando(data.id_comando ?? data.datos?.comando ?? data.datos?.id_comando ?? data.comando ?? data.movimiento);
-    if (otroComando) {
-        mostrarPasoDemo(otroComando, data.fecha_hora || data.datos?.fecha_hora);
-    }
-}
-
-// Consulta el último estado y los últimos 10 movimientos desde la API (RDS)
-async function cargarMonitoreo() {
-    try {
-        const [resEstado, resHistorial] = await Promise.allSettled([
-            api.obtenerUltimoEstado(),
-            api.obtenerHistorial()
-        ]);
-
-        if (resHistorial.status === 'fulfilled' && Array.isArray(resHistorial.value)) {
-            historialLocal = resHistorial.value.map(reg => ({
-                ...reg,
-                comando: reg.comando || reg.nombre_comando || obtenerNombreComando(reg.id_comando) || 'Desconocido'
-            }));
-            ui.renderHistorial(historialLocal);
-        }
-
-        if (resEstado.status === 'fulfilled' && resEstado.value) {
-            const est = Array.isArray(resEstado.value) ? resEstado.value[0] : (resEstado.value.datos || resEstado.value);
-            if (est) {
-                const comandoNombre = est.comando || est.nombre_comando || obtenerNombreComando(est.id_comando) || historialLocal[0]?.comando;
-                const fechaValor = est.fecha_actualizacion || est.fecha_hora || est.fecha || historialLocal[0]?.fecha_hora;
-                ui.renderUltimoEstado({
-                    ...est,
-                    comando: comandoNombre,
-                    fecha_actualizacion: fechaValor
-                });
-                return;
-            }
-        }
-
-        if (historialLocal.length > 0) {
-            ui.renderUltimoEstado(historialLocal[0]);
-        }
-    } catch (error) {
-        console.error('Error cargando monitoreo:', error);
-    }
-}
-
-// Carga los catálogos; si AWS no responde, reintenta cada 8 s
-async function cargarDatos() {
+// Carga los catálogos de comandos y demos (reintenta cada 8 s si AWS no responde)
+async function cargarCatalogos() {
     clearTimeout(reintentoTimer);
     ui.updateAwsStatus('Comprobando...');
     try {
-        const comandos = await api.obtenerComandos();
+        catalogoComandos = await api.obtenerComandos();
         const demos = await api.obtenerDemos();
-        catalogoComandos = comandos;
-        catalogoDemos = Array.isArray(demos) ? demos : [];
 
         const cmdDetener = catalogoComandos.find(c => c.nombre === 'Detener');
         if (cmdDetener) idComandoDetener = cmdDetener.id_comando;
 
+        // Renderizar UI de Control
         ui.renderComandos(catalogoComandos, ejecutarComando);
         ui.renderDemos(demos);
         ui.setOffline(false);
 
         primerFallo = true;
         document.getElementById('action-feedback').classList.add('d-none');
-
-        // Cargar estado e historial inicial de Monitoreo
-        cargarMonitoreo();
     } catch (error) {
-        console.error('Error cargando datos:', error);
+        console.error('Error cargando catálogos:', error);
         if (primerFallo) {
             ui.showFeedback('Sin conexión con AWS. Reintentando...', 'danger');
             primerFallo = false;
         }
-        reintentoTimer = setTimeout(cargarDatos, 8000);
+        reintentoTimer = setTimeout(cargarCatalogos, 8000);
     }
 }
 
-// Consulta el endpoint de salud
+// --- LÓGICA DE MONITOREO (REST + WSS) ---
+
+async function cargarDatosMonitoreo() {
+    try {
+        // Obtenemos el estado actual y el historial en paralelo desde RDS
+        const [ultimoEstado, historial] = await Promise.all([
+            api.obtenerUltimoEstado(),
+            api.obtenerHistorial()
+        ]);
+
+        ui.renderUltimoEstado(ultimoEstado);
+        ui.renderHistorial(historial);
+    } catch (error) {
+        console.error('Error al cargar datos de monitoreo:', error);
+    }
+}
+
+async function procesarMensajeWSS(payload) {
+    if (!payload) return;
+
+    // 1. Eventos de DEMO: actualizan tanto el aviso/joystick en Control como la tarjeta en Monitoreo
+    if (payload.tipo_evento === 'inicio_demo') {
+        ui.showFeedback('Iniciando DEMO...', 'success', 2500);
+        return;
+    }
+
+    if (payload.tipo_evento === 'movimiento_demo') {
+        const cmdObj = catalogoComandos.find(c => c.id_comando === payload.comando_en_ejecucion);
+        const nombreBase = cmdObj
+            ? cmdObj.nombre
+            : (MAPA_COMANDOS_ID[payload.comando_en_ejecucion] || `Comando ID: ${payload.comando_en_ejecucion}`);
+
+        // En vista Control: mostrar el movimiento en ejecución y resaltar el joystick
+        const norm = normalizar(nombreBase);
+        if (norm === 'DETENER' || norm === 'STOP') {
+            ui.playSound('stop');
+            ui.limpiarResaltadoDemo();
+            ui.showFeedback(`Enviando: ${nombreBase}`, 'info', 2500);
+        } else {
+            ui.playSound('joy');
+            ui.resaltarMovimientoDemo(nombreBase);
+            ui.showFeedback(`Enviando: ${nombreBase}`, 'info', 4000);
+        }
+
+        // En vista Monitoreo: actualizar la tarjeta superior (sin recargar la tabla, pues las demos no se guardan como historial individual)
+        ui.renderUltimoEstado({
+            comando: `${nombreBase} (DEMO)`,
+            fecha_actualizacion: new Date().toISOString()
+        });
+        return;
+    }
+
+    if (payload.tipo_evento === 'cancelacion_demo') {
+        ui.limpiarResaltadoDemo();
+        ui.showFeedback('DEMO cancelada', 'warning', 2500);
+        ui.renderUltimoEstado({
+            comando: 'DEMO CANCELADA',
+            fecha_actualizacion: new Date().toISOString()
+        });
+        return;
+    }
+
+    // 2. Si no estamos en la pestaña de monitoreo, ignoramos la recarga de tabla para ahorrar recursos
+    if (vistaActual !== 'monitoreo') return;
+
+    // 3. Reconciliación para movimientos individuales y estado inicial en Monitoreo
+    if (payload.tipo_evento === 'estado_inicial' || payload.tipo_evento === 'movimiento_individual') {
+        // Actualizamos la tarjeta grande inmediatamente con el dato del WSS
+        if (payload.datos) {
+            ui.renderUltimoEstado({
+                ...payload.datos,
+                fecha_actualizacion: payload.datos.fecha_actualizacion || payload.datos.fecha_hora || new Date().toISOString()
+            });
+        }
+
+        // Si fue un movimiento nuevo, recargamos la tabla de los últimos 10 desde RDS
+        if (payload.tipo_evento === 'movimiento_individual') {
+            // Pequeño retraso de 600ms para darle tiempo a AWS de hacer el COMMIT en MySQL
+            setTimeout(async () => {
+                try {
+                    const historial = await api.obtenerHistorial();
+                    ui.renderHistorial(historial);
+                } catch (e) {
+                    console.error('Error actualizando tabla tras WSS:', e);
+                }
+            }, 600);
+        }
+    }
+}
+
+// --- LÓGICA DE CONTROL Y SALUD ---
+
 async function verificarRDS() {
     const rdsBadge = document.getElementById('status-rds');
     rdsBadge.innerHTML = `<i class="bi bi-arrow-repeat"></i> RDS: Consultando...`;
@@ -340,7 +303,6 @@ async function ejecutarComando(idComando, nombreComando) {
     try {
         ui.showFeedback(`Enviando: ${nombreComando}`);
         await api.ejecutarMovimiento(idComando);
-        cargarMonitoreo();
     } catch (error) {
         // El error ya lo maneja api.js
     }
