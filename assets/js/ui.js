@@ -34,7 +34,33 @@ class UIController {
         this._timer = null;
         this._audioCtx = null;
         this.onSwitchToMonitoreo = null;
+        this.initSplashScreen();
         this.initSpaceBackground();
+    }
+
+    // --- PANTALLA DE BIENVENIDA / CARGA INICIAL (SPLASH SCREEN) ---
+    initSplashScreen() {
+        const splash = document.getElementById('splash-screen');
+        const bar = document.getElementById('splash-progress-bar');
+        if (!splash || !bar) return;
+
+        // Progreso escalonado suave de 0% a 100% antes de mostrar la vista de Control
+        const pasos = [
+            [120, '28%'],
+            [520, '62%'],
+            [1050, '86%'],
+            [1550, '100%']
+        ];
+
+        pasos.forEach(([delay, pct]) => {
+            setTimeout(() => {
+                bar.style.width = pct;
+            }, delay);
+        });
+
+        setTimeout(() => {
+            splash.classList.add('is-hidden');
+        }, 1950);
     }
 
     // --- NAVEGACIÓN DE VISTAS (Control / Monitoreo) ---

@@ -1,6 +1,6 @@
 // assets/js/websocket.js
-import { CONFIG } from './config.js?v=11';
-import { ui } from './ui.js?v=11';
+import { CONFIG } from './config.js?v=12';
+import { ui } from './ui.js?v=12';
 
 class WebSocketManager {
     constructor() {

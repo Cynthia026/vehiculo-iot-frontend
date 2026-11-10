@@ -54,7 +54,8 @@ vehiculo-iot-frontend/
 
 ## ⚙️ ¿Cómo Funciona la Aplicación?
 
-### 1. Panel de Conectividad e Inicialización (`app.js` y `ui.js`)
+### 1. Pantalla de Inicio (Splash Screen), Conectividad e Inicialización (`app.js` y `ui.js`)
+* **Splash Screen Animada (`#splash-screen`):** Al abrir la aplicación se presenta una pantalla de bienvenida espacial con resplandor radial, el logotipo oficial del vehículo con animación flotante, tipografía espaciada (`VEHÍCULO IOT · CONTROL EXCAVADORA IOT`) y una barra de progreso animada antes de dar paso a la vista de **Control**.
 * **Indicadores Independientes en Cabecera:**
   * **WSS:** Estado en vivo del WebSocket (`Conectando...`, `En línea`, `Reconectando...` o `Desconectado`).
   * **AWS:** Estado del servidor FastAPI (`Disponible` o `No disponible`).

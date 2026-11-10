@@ -1,9 +1,9 @@
 // assets/js/app.js
-import { api } from './api.js?v=11';
-import { wsManager } from './websocket.js?v=11';
-import { ui, normalizar } from './ui.js?v=11';
-import { Joystick } from './joystick.js?v=11';
-import { CONFIG } from './config.js?v=11';
+import { api } from './api.js?v=12';
+import { wsManager } from './websocket.js?v=12';
+import { ui, normalizar } from './ui.js?v=12';
+import { Joystick } from './joystick.js?v=12';
+import { CONFIG } from './config.js?v=12';
 
 let catalogoComandos = [];
 let idComandoDetener = null;
