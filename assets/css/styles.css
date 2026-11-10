@@ -606,13 +606,15 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
 /* ===== Tableta y escritorio (Laptop) ===== */
 @media (min-width: 768px) {
     :root { --joy: clamp(140px, min(calc(27vw - 3.6rem), 36vh), 320px); }
+    html, body { height: 100dvh; max-height: 100dvh; overflow: hidden; }
     .app-header { padding: .7rem 1.5rem; }
     .app-title-icon { width: 56px; height: 56px; }
     .app-title h1 { font-size: 1.1rem; }
     .app-tab { padding: .4rem 1.2rem; font-size: .84rem; }
     .status-group .badge { font-size: .72rem; padding: .42rem .68rem; }
     .app-main {
-        padding: 1.5rem 2rem;
+        padding: 1.1rem 2rem;
+        overflow: hidden;
     }
     .vista-control {
         display: grid;
@@ -621,6 +623,9 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
         gap: 1.5rem;
     }
     .panel { padding: 1.4rem; }
+    .monitor-last-card { padding: .85rem 1.25rem; }
+    .monitor-history-card { padding: .85rem 1.25rem; }
+    .monitor-table td, .monitor-table th { padding: .35rem .5rem; }
     .panel-title { font-size: .95rem; margin-bottom: .9rem; }
     .drive-panel { justify-content: center; gap: 1.5rem; padding: 1.5rem; }
     .pad-title { font-size: 1rem; margin-bottom: 1rem; }

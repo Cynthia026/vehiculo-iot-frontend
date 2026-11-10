@@ -1,9 +1,9 @@
 // assets/js/app.js
-import { api } from './api.js?v=9';
-import { wsManager } from './websocket.js?v=9';
-import { ui, normalizar } from './ui.js?v=9';
-import { Joystick } from './joystick.js?v=9';
-import { CONFIG } from './config.js?v=9';
+import { api } from './api.js?v=10';
+import { wsManager } from './websocket.js?v=10';
+import { ui, normalizar } from './ui.js?v=10';
+import { Joystick } from './joystick.js?v=10';
+import { CONFIG } from './config.js?v=10';
 
 let catalogoComandos = [];
 let catalogoDemos = [];

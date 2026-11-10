@@ -65,10 +65,17 @@ class UIController {
         }
     }
 
-    // --- FORMATO FECHAS (DD/MM/YYYY y HH:MM:SS) ---
+    // --- FORMATO FECHAS (Convierte fecha UTC de AWS/RDS a hora local DD/MM/YYYY y HH:MM:SS) ---
     formatearFechaHora(fechaIso) {
         if (!fechaIso) return { fecha: '--/--/----', hora: '--:--:--' };
-        const date = new Date(fechaIso);
+
+        let str = String(fechaIso).trim();
+        // AWS/RDS envía las fechas en UTC sin 'Z' al final (ej. "2026-11-10T00:17:16" o "2026-11-10 00:17:16")
+        if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(str)) {
+            str = str.replace(' ', 'T') + 'Z';
+        }
+
+        const date = new Date(str);
         if (isNaN(date.getTime())) return { fecha: '--/--/----', hora: '--:--:--' };
 
         const dia = String(date.getDate()).padStart(2, '0');
