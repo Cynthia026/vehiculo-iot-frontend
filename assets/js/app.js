@@ -1,13 +1,14 @@
 // assets/js/app.js
-import { api } from './api.js?v=12';
-import { wsManager } from './websocket.js?v=12';
-import { ui, normalizar } from './ui.js?v=12';
-import { Joystick } from './joystick.js?v=12';
-import { CONFIG } from './config.js?v=12';
+import { api } from './api.js?v=13';
+import { wsManager } from './websocket.js?v=13';
+import { ui, normalizar } from './ui.js?v=13';
+import { Joystick } from './joystick.js?v=13';
+import { CONFIG } from './config.js?v=13';
+import { adminManager } from './admin.js?v=13';
 
 let catalogoComandos = [];
 let idComandoDetener = null;
-let vistaActual = 'control'; // Estado para saber qué pestaña estamos viendo
+let vistaActual = 'control'; // 'control' | 'monitoreo' | 'admin'
 
 let reintentoTimer = null;
 let primerFallo = true;
@@ -35,15 +36,30 @@ async function inicializar() {
         ui.setOffline(true);
         configurarControles();
 
-        // 2. Conectar WSS y enlazar la escucha de mensajes
+        // 2. Inicializar módulo de Administración (Práctica 4.3: RBAC, inventario, demos y sesiones)
+        adminManager.init({
+            onUnitChanged: async (idVehiculoRds) => {
+                wsManager.reconnectForVehicle(idVehiculoRds);
+                await cargarCatalogos();
+                if (vistaActual === 'monitoreo') {
+                    await cargarDatosMonitoreo();
+                }
+            },
+            onStopVehicle: async () => {
+                await detenerVehiculo();
+            }
+        });
+
+        // 3. Conectar WSS y enlazar la escucha de mensajes
         wsManager.onMessage = procesarMensajeWSS;
         wsManager.connect();
 
-        // 3. Verificar estado de Amazon RDS
+        // 4. Verificar estado de Amazon RDS
         await verificarRDS();
 
-        // 4. Cargar Catálogos para Control
+        // 5. Cargar Catálogos para Control y sincronizar inventario con RDS
         await cargarCatalogos();
+        adminManager.sincronizarDesdeRds();
 
     } catch (error) {
         console.error('Error en la inicialización:', error);
@@ -53,14 +69,15 @@ async function inicializar() {
 
 // Configura los eventos de botones, pestañas y ambos joysticks una sola vez
 function configurarControles() {
-    // Bloquear desplazamiento de la pantalla al arrastrar los joysticks en móviles
+    // Bloquear desplazamiento de la pantalla al arrastrar los joysticks en móviles (permitiendo scroll en Administración)
     document.addEventListener('touchmove', (e) => {
-        if (!e.target.closest('select, .monitor-table-container')) {
+        if (vistaActual === 'admin') return;
+        if (!e.target.closest('select, .monitor-table-container, .vista-admin')) {
             e.preventDefault();
         }
     }, { passive: false });
 
-    // Eventos Botones Control
+    // Eventos Botones Control (DETENER conserva prioridad de seguridad física)
     document.getElementById('btn-stop').addEventListener('click', () => {
         ui.limpiarResaltadoDemo();
         ui.playSound('stop');
@@ -73,6 +90,13 @@ function configurarControles() {
     });
 
     document.getElementById('btn-demo-start').addEventListener('click', async () => {
+        const idLogico = CONFIG.VEHICULO_ACTIVO_LOGICO || CONFIG.VEHICULO_ID;
+        const perm = adminManager.verificarPermisoOperacion(idLogico, false);
+        if (!perm.ok) {
+            ui.playSound('cancel');
+            return;
+        }
+
         const select = document.getElementById('demo-select');
         if (!select.value) {
             ui.playSound('cancel');
@@ -86,7 +110,7 @@ function configurarControles() {
             await api.ejecutarDemo(select.value);
         } catch (error) {
             ui.limpiarResaltadoDemo();
-            ui.showFeedback('No se pudo iniciar la DEMO', 'danger');
+            ui.showFeedback(error.message || 'No se pudo iniciar la DEMO', 'danger');
         }
     });
 
@@ -102,7 +126,7 @@ function configurarControles() {
         }
     });
 
-    // Configurar Eventos de Pestañas (Navegación SPA)
+    // Configurar Eventos de Pestañas (Navegación SPA: Control | Monitoreo | Administración)
     document.getElementById('btn-tab-control').addEventListener('click', () => {
         vistaActual = 'control';
         ui.switchView('control');
@@ -113,6 +137,15 @@ function configurarControles() {
         ui.switchView('monitoreo');
         cargarDatosMonitoreo(); // Hace los GET iniciales al abrir la pestaña
     });
+
+    const btnTabAdmin = document.getElementById('btn-tab-admin');
+    if (btnTabAdmin) {
+        btnTabAdmin.addEventListener('click', () => {
+            vistaActual = 'admin';
+            ui.switchView('admin');
+            adminManager.sincronizarDesdeRds();
+        });
+    }
 
     // Inicializar Joysticks (Movimiento y Brazo/Motores)
     new Joystick('joystick-zone', 'joystick-knob', (dir) => {
@@ -131,11 +164,30 @@ async function cargarCatalogos() {
     clearTimeout(reintentoTimer);
     ui.updateAwsStatus('Comprobando...');
     try {
-        catalogoComandos = await api.obtenerComandos();
+        const comandosRaw = await api.obtenerComandos();
         const demos = await api.obtenerDemos();
 
-        const cmdDetener = catalogoComandos.find(c => c.nombre === 'Detener');
+        // Filtrar comandos según capacidades reales del modelo comercial activo
+        const idLogico = CONFIG.VEHICULO_ACTIVO_LOGICO || CONFIG.VEHICULO_ID;
+        const unidadInfo = adminManager.obtenerUnidadEnriquecida(idLogico);
+        const modeloObj = adminManager.state.modelos.find(m => Number(m.id_modelo) === Number(unidadInfo.id_modelo));
+
+        catalogoComandos = (Array.isArray(comandosRaw) ? comandosRaw : []).filter(c => {
+            if (c.activo === false || c.activo === 0) return false;
+            if (modeloObj && !modeloObj.tiene_brazo && /BRAZO/.test(normalizar(c.nombre))) return false;
+            return true;
+        });
+
+        const cmdDetener = catalogoComandos.find(c => normalizar(c.nombre) === 'DETENER')
+            || (Array.isArray(comandosRaw) ? comandosRaw.find(c => normalizar(c.nombre) === 'DETENER') : null);
         if (cmdDetener) idComandoDetener = cmdDetener.id_comando;
+
+        // Ocultar/deshabilitar visualmente el pad de Brazo si el modelo comercial no incluye brazo
+        const padArm = document.getElementById('joystick-zone-arm')?.closest('.pad');
+        if (padArm) {
+            padArm.style.opacity = (modeloObj && !modeloObj.tiene_brazo) ? '0.42' : '1';
+            padArm.title = (modeloObj && !modeloObj.tiene_brazo) ? 'Este modelo comercial no incluye brazo hidráulico' : '';
+        }
 
         // Renderizar UI de Control
         ui.renderComandos(catalogoComandos, ejecutarComando);
@@ -221,7 +273,6 @@ async function procesarMensajeWSS(payload) {
 
     // 3. Reconciliación para movimientos individuales y estado inicial en Monitoreo
     if (payload.tipo_evento === 'estado_inicial' || payload.tipo_evento === 'movimiento_individual') {
-        // Actualizamos la tarjeta grande inmediatamente con el dato del WSS
         if (payload.datos) {
             ui.renderUltimoEstado({
                 ...payload.datos,
@@ -229,7 +280,6 @@ async function procesarMensajeWSS(payload) {
             });
         }
 
-        // Si fue un movimiento nuevo, recargamos la tabla de los últimos 10 desde RDS
         if (payload.tipo_evento === 'movimiento_individual') {
             // Pequeño retraso de 600ms para darle tiempo a AWS de hacer el COMMIT en MySQL
             setTimeout(async () => {
@@ -296,10 +346,22 @@ async function manejarMovimientoBrazo(direccion) {
         'DERECHA': 'MOTOR_DERECHA'
     };
     const comando = catalogoComandos.find(c => normalizar(c.nombre || c.comando || '') === mapa[direccion]);
-    if (comando) ejecutarComando(comando.id_comando, comando.nombre);
+    if (comando) {
+        ejecutarComando(comando.id_comando, comando.nombre);
+    } else if (/ADELANTE|ATRAS/.test(direccion)) {
+        ui.showFeedback('Este modelo comercial no incluye brazo hidráulico', 'warning', 2000);
+    }
 }
 
 async function ejecutarComando(idComando, nombreComando) {
+    // Seguridad: DETENER siempre tiene prioridad física; el resto valida RBAC + BOLA + Soporte
+    const esDetener = normalizar(nombreComando) === 'DETENER';
+    if (!esDetener) {
+        const idLogico = CONFIG.VEHICULO_ACTIVO_LOGICO || CONFIG.VEHICULO_ID;
+        const perm = adminManager.verificarPermisoOperacion(idLogico, false);
+        if (!perm.ok) return;
+    }
+
     try {
         ui.showFeedback(`Enviando: ${nombreComando}`);
         await api.ejecutarMovimiento(idComando);

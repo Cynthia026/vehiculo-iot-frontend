@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#0d1220">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Control y Monitoreo IoT - Vehículo</title>
+    <title>Control, Monitoreo y Administración IoT - Vehículos</title>
 
-    <link rel="icon" type="image/png" href="assets/Favicon_Iot_vehiculo.png?v=9">
-    <link rel="apple-touch-icon" href="assets/Favicon_Iot_vehiculo.png?v=9">
+    <link rel="icon" type="image/png" href="assets/Favicon_Iot_vehiculo.png?v=13">
+    <link rel="apple-touch-icon" href="assets/Favicon_Iot_vehiculo.png?v=13">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,9 +17,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <link rel="stylesheet" href="assets/css/styles.css?v=12">
+    <link rel="stylesheet" href="assets/css/styles.css?v=13">
 </head>
-<body>
+<body data-view="control">
 
     <!-- Pantalla de inicio / carga (Splash Screen) -->
     <div id="splash-screen" class="splash-screen" role="status" aria-label="Iniciando aplicación">
@@ -29,7 +29,7 @@
                 <img src="assets/Favicon_Iot_vehiculo.png" alt="Logo Vehículo IoT" class="splash-logo">
             </div>
             <h1 class="splash-title">VEHÍCULO <span>IOT</span></h1>
-            <p class="splash-subtitle">CONTROL EXCAVADORA IOT</p>
+            <p class="splash-subtitle">CONTROL &middot; MONITOREO &middot; ADMINISTRACIÓN</p>
             <div class="splash-progress-track">
                 <div id="splash-progress-bar" class="splash-progress-bar"></div>
             </div>
@@ -39,17 +39,20 @@
     <!-- Fondo astronómico animado -->
     <canvas id="space-bg" class="space-bg" aria-hidden="true"></canvas>
 
-    <!-- Encabezado: título, pestañas de navegación y estado de conectividad -->
+    <!-- Encabezado: título, unidad activa, pestañas de navegación y estado de conectividad -->
     <header class="app-header">
         <div class="app-title">
             <img class="app-title-icon" src="assets/Favicon_Iot_vehiculo.png" alt="Logo Vehículo IoT">
             <div>
                 <h1>Vehículo IoT</h1>
-                <small>Unidad 1</small>
+                <small id="header-unit-subtitle">Unidad 1 &middot; SN-EXC-0001</small>
             </div>
+            <select id="header-unit-select" class="header-unit-select" aria-label="Seleccionar unidad activa" title="Cambiar unidad física activa">
+                <option value="1">#1 Unidad 1 (VENDIDO)</option>
+            </select>
         </div>
 
-        <!-- Navegación de vistas: Control / Monitoreo -->
+        <!-- Navegación de vistas: Control / Monitoreo / Administración -->
         <nav class="app-tabs" id="appTabs" aria-label="Navegación de vistas">
             <button type="button" class="app-tab active" id="btn-tab-control">
                 <i class="bi bi-controller"></i> Control
@@ -57,9 +60,15 @@
             <button type="button" class="app-tab" id="btn-tab-monitoreo">
                 <i class="bi bi-activity"></i> Monitoreo
             </button>
+            <button type="button" class="app-tab" id="btn-tab-admin">
+                <i class="bi bi-shield-lock"></i> Administración
+            </button>
         </nav>
 
         <div class="status-group" id="status-panel">
+            <button type="button" id="btn-role-switcher" class="badge status-badge role-header-btn" title="Rol activo (Clic para cambiar perfil en Administración)">
+                <i class="bi bi-person-badge"></i> <span id="header-role-text">USUARIO: Cynthia</span>
+            </button>
             <div id="status-wss" class="badge bg-secondary status-badge" title="Estado del WebSocket">
                 <i class="bi bi-broadcast"></i> WSS: Desconectado
             </div>
@@ -90,7 +99,7 @@
                             <span class="jz-mark jz-right"><i class="bi bi-chevron-right"></i></span>
                             <div id="joystick-knob" class="joystick-knob"><i class="bi bi-arrows-move"></i></div>
                         </div>
-                        <p class="pad-hint">Avanzar · Retroceder · Girar</p>
+                        <p class="pad-hint">Avanzar &middot; Retroceder &middot; Girar</p>
                     </div>
                     <div class="pad">
                         <h2 class="pad-title">Brazo y motores</h2>
@@ -101,7 +110,7 @@
                             <span class="jz-mark jz-right"><i class="bi bi-arrow-clockwise"></i></span>
                             <div id="joystick-knob-arm" class="joystick-knob"><i class="bi bi-gear-wide-connected"></i></div>
                         </div>
-                        <p class="pad-hint">Brazo ↕ · Motores ↔</p>
+                        <p class="pad-hint">Brazo ↕ &middot; Motores ↔</p>
                     </div>
                 </div>
                 <button id="btn-stop" class="btn-stop" disabled>
@@ -190,12 +199,326 @@
             </section>
         </div>
 
+        <!-- ================= VISTA ADMINISTRACIÓN (Práctica 4.3) ================= -->
+        <div id="vista-admin" class="vista-admin d-none">
+
+            <!-- Barra Superior: Selector de Rol / Sesión y Pruebas de Seguridad RBAC / BOLA -->
+            <section class="panel admin-session-panel" aria-label="Control de sesión y roles">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                        <h2 class="panel-title mb-0"><i class="bi bi-person-check-fill"></i> Control de Acceso Basado en Roles (RBAC) y Propiedad de Recurso</h2>
+                        <small class="text-secondary">Alterna entre los 3 roles del modelo comercial para operar y auditar permisos en vivo.</small>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm admin-role-btn" data-switch-profile="ADMIN">
+                            <i class="bi bi-building-gear"></i> Administrador (Empresa)
+                        </button>
+                        <button type="button" class="btn btn-sm admin-role-btn active" data-switch-profile="USUARIO_A">
+                            <i class="bi bi-person-badge"></i> Usuario A (Cynthia · Unidad #1)
+                        </button>
+                        <button type="button" class="btn btn-sm admin-role-btn" data-switch-profile="USUARIO_B">
+                            <i class="bi bi-person-lock"></i> Usuario B (Carlos · Unidad #3)
+                        </button>
+                        <button type="button" class="btn btn-sm admin-role-btn" data-switch-profile="INVITADO">
+                            <i class="bi bi-clock-history"></i> Invitado (Demo 3 min)
+                        </button>
+                    </div>
+                </div>
+
+                <div id="admin-current-session-banner" class="admin-session-banner"></div>
+
+                <!-- Verificador rápido de casos negativos de seguridad exigidos por la rúbrica -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top border-secondary border-opacity-25">
+                    <span class="small text-secondary"><i class="bi bi-shield-shaded text-warning"></i> <strong>Pruebas de Autorización y Casos Negativos (403):</strong></span>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-bola-cruzado">
+                            Probar BOLA: Usuario A → Unidad Ajena
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-admin-sin-soporte">
+                            Probar Admin → Unidad Vendida sin Soporte
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-invitado-unidad-vendida">
+                            Probar Invitado → Unidad de Comprador
+                        </button>
+                    </div>
+                </div>
+                <div id="security-test-output" class="security-test-output d-none mt-2"></div>
+            </section>
+
+            <!-- ================= SECCIÓN ROL: ADMINISTRADOR (EMPRESA) ================= -->
+            <div id="admin-role-section-admin" class="admin-role-section d-none">
+                <!-- Métricas Reales -->
+                <div id="admin-metrics-grid" class="admin-metrics-grid"></div>
+
+                <div class="admin-two-col">
+                    <!-- Inventario de Unidades Físicas -->
+                    <section class="panel">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="panel-title mb-0"><i class="bi bi-truck-flatbed"></i> Inventario de Unidades Físicas (RDS)</h2>
+                            <span class="badge bg-dark border border-info text-info">Separación Modelo vs. Unidad</span>
+                        </div>
+                        <div class="admin-table-wrap mb-3">
+                            <table class="monitor-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Núm. Serie</th>
+                                        <th>Unidad / Modelo</th>
+                                        <th>Estado</th>
+                                        <th>Propietario</th>
+                                        <th>Privacidad / Soporte</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-admin-unidades"></tbody>
+                            </table>
+                        </div>
+
+                        <!-- Formulario Alta de Unidad Física -->
+                        <form id="form-admin-unidad" class="admin-inline-form">
+                            <h3 class="h6 fw-bold mb-2"><i class="bi bi-plus-circle text-info"></i> Registrar Nueva Unidad Física en RDS</h3>
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-3">
+                                    <input type="text" id="unit-form-nombre" class="form-control form-control-sm admin-input" placeholder="Nombre (ej. Unidad 4)" required>
+                                </div>
+                                <div class="col-12 col-sm-3">
+                                    <input type="text" id="unit-form-serie" class="form-control form-control-sm admin-input" placeholder="Serie (ej. SN-EXC-0004)" required>
+                                </div>
+                                <div class="col-12 col-sm-3">
+                                    <select id="unit-form-modelo" class="form-select form-select-sm admin-input"></select>
+                                </div>
+                                <div class="col-6 col-sm-2">
+                                    <select id="unit-form-estado" class="form-select form-select-sm admin-input">
+                                        <option value="DISPONIBLE">DISPONIBLE</option>
+                                        <option value="EXHIBICION">EXHIBICION</option>
+                                    </select>
+                                </div>
+                                <div class="col-6 col-sm-1 d-grid">
+                                    <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">Crear</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <!-- Catálogo de Modelos Comerciales y Comandos por Unidad -->
+                    <section class="panel">
+                        <h2 class="panel-title"><i class="bi bi-boxes"></i> Catálogo de Modelos Comerciales</h2>
+                        <div class="admin-table-wrap mb-2">
+                            <table class="monitor-table">
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Modelo Comercial</th>
+                                        <th>MCU</th>
+                                        <th>Capacidades Hardware</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-admin-modelos"></tbody>
+                            </table>
+                        </div>
+                        <form id="form-admin-modelo" class="admin-inline-form mb-3">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-4">
+                                    <input type="text" id="mod-form-codigo" class="form-control form-control-sm admin-input" placeholder="Código (GRU-V1)" required>
+                                </div>
+                                <div class="col-4">
+                                    <input type="text" id="mod-form-nombre" class="form-control form-control-sm admin-input" placeholder="Nombre modelo" required>
+                                </div>
+                                <div class="col-2">
+                                    <input type="text" id="mod-form-micro" class="form-control form-control-sm admin-input" value="ESP8266">
+                                </div>
+                                <div class="col-2 d-flex align-items-center justify-content-between">
+                                    <div class="form-check m-0" title="¿Incluye brazo articulado?">
+                                        <input class="form-check-input" type="checkbox" id="mod-form-brazo" checked>
+                                        <label class="form-check-label small" for="mod-form-brazo">Brazo</label>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-outline-info">+</button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- Configuración de Comandos Permitidos por Unidad -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 class="panel-title mb-0"><i class="bi bi-sliders"></i> Comandos Habilitados en RDS</h3>
+                            <select id="cmd-admin-unit-select" class="form-select form-select-sm admin-input w-auto"></select>
+                        </div>
+                        <div id="admin-comandos-list" class="admin-comandos-grid"></div>
+                    </section>
+                </div>
+
+                <div class="admin-two-col">
+                    <!-- Clientes Compradores y Asignación de Unidades -->
+                    <section class="panel">
+                        <h2 class="panel-title"><i class="bi bi-people-fill"></i> Clientes Compradores y Asignación de Propiedad</h2>
+                        <div class="admin-table-wrap mb-3">
+                            <table class="monitor-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Cliente Comprador</th>
+                                        <th>Correo</th>
+                                        <th>Unidades Asignadas</th>
+                                        <th>Vista Previa</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-admin-clientes"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <form id="form-admin-cliente" class="admin-inline-form h-100">
+                                    <h3 class="h6 fw-bold mb-2"><i class="bi bi-person-plus text-info"></i> Registrar Cliente</h3>
+                                    <input type="text" id="cli-form-nombre" class="form-control form-control-sm admin-input mb-2" placeholder="Nombre completo" required>
+                                    <div class="d-flex gap-2">
+                                        <input type="email" id="cli-form-email" class="form-control form-control-sm admin-input" placeholder="correo@cliente.com" required>
+                                        <input type="password" id="cli-form-pass" class="form-control form-control-sm admin-input" value="Cliente123*" required>
+                                        <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">Alta</button>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <form id="form-admin-asignacion" class="admin-inline-form h-100">
+                                    <h3 class="h6 fw-bold mb-2"><i class="bi bi-key-fill text-warning"></i> Asignar Unidad a Comprador</h3>
+                                    <select id="asig-form-vehiculo" class="form-select form-select-sm admin-input mb-2"></select>
+                                    <div class="d-flex gap-2">
+                                        <select id="asig-form-cliente" class="form-select form-select-sm admin-input"></select>
+                                        <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold">Asignar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Bitácora de Auditoría -->
+                    <section class="panel">
+                        <h2 class="panel-title"><i class="bi bi-journal-check"></i> Bitácora de Auditoría y Seguridad</h2>
+                        <div class="admin-table-wrap">
+                            <table class="monitor-table">
+                                <thead>
+                                    <tr>
+                                        <th>Evento</th>
+                                        <th>Actor / Rol</th>
+                                        <th>Detalle</th>
+                                        <th>Fecha / Hora</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-admin-auditoria"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- ================= SECCIÓN ROL: USUARIO COMPRADOR ================= -->
+            <div id="admin-role-section-usuario" class="admin-role-section">
+                <section class="panel">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <h2 class="panel-title mb-0"><i class="bi bi-car-front-fill"></i> Mis Vehículos Asignados</h2>
+                            <small class="text-secondary">Sólo tú puedes operar tus unidades. El Administrador requiere tu autorización explícita para soporte.</small>
+                        </div>
+                        <span class="badge bg-success"><i class="bi bi-shield-check"></i> Aislamiento por Propietario Activo</span>
+                    </div>
+                    <div id="usuario-mis-vehiculos-grid" class="user-vehicles-grid"></div>
+                </section>
+            </div>
+
+            <!-- ================= SECCIÓN ROL: INVITADO (SHOWROOM TEMPORAL) ================= -->
+            <div id="admin-role-section-invitado" class="admin-role-section d-none">
+                <section class="panel mb-3">
+                    <h2 class="panel-title"><i class="bi bi-stopwatch-fill"></i> Sesión Temporal de Demostración (Unidad de Exhibición)</h2>
+                    <div id="invitado-reserva-status" class="admin-session-banner mb-3"></div>
+
+                    <h3 class="panel-title"><i class="bi bi-grid-1x2-fill"></i> Catálogo Público de Modelos Vehiculares IoT</h3>
+                    <div id="invitado-catalogo-grid" class="user-vehicles-grid"></div>
+                </section>
+            </div>
+
+            <!-- ================= EDITOR DE SECUENCIAS DEMO Y PASOS ORDENADOS (ADMIN + USUARIO) ================= -->
+            <section class="panel" id="panel-editor-demos" aria-label="Editor de secuencias DEMO">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                        <h2 class="panel-title mb-0"><i class="bi bi-Sliders2-vertical"></i> <i class="bi bi-list-ol"></i> Editor de Secuencias DEMO y Pasos Ordenados (Amazon RDS)</h2>
+                        <small class="text-secondary">Crea rutinas, agrega movimientos compatibles, define duración (100–10,000 ms), reordena pasos y ejecútalos con prioridad de DETENER.</small>
+                    </div>
+                    <span class="badge monitor-rds-pill"><i class="bi bi-database-check"></i> Persistido en RDS</span>
+                </div>
+
+                <div class="admin-two-col">
+                    <!-- Lista de Demos y Creación -->
+                    <div>
+                        <div id="editor-demos-lista" class="demo-editor-list mb-3"></div>
+
+                        <form id="form-editor-nueva-demo" class="admin-inline-form">
+                            <h3 class="h6 fw-bold mb-2"><i class="bi bi-plus-square text-success"></i> Nueva Secuencia DEMO</h3>
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-5">
+                                    <input type="text" id="demo-form-nombre" class="form-control form-control-sm admin-input" placeholder="Nombre de la DEMO" required>
+                                </div>
+                                <div class="col-12 col-sm-5">
+                                    <input type="text" id="demo-form-desc" class="form-control form-control-sm admin-input" placeholder="Descripción de la rutina">
+                                </div>
+                                <div class="col-12 col-sm-2 d-grid">
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold">Guardar</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Constructor de Pasos Ordenados -->
+                    <div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h3 id="editor-pasos-titulo" class="h6 fw-bold mb-0 text-info">Pasos de la secuencia</h3>
+                            <small class="text-secondary">Orden secuencial validado</small>
+                        </div>
+                        <div class="admin-table-wrap mb-3">
+                            <table class="monitor-table">
+                                <thead>
+                                    <tr>
+                                        <th>Orden</th>
+                                        <th>Comando</th>
+                                        <th>Duración</th>
+                                        <th>Pausa</th>
+                                        <th>Reordenar / Quitar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-editor-pasos"></tbody>
+                            </table>
+                        </div>
+
+                        <form id="form-editor-agregar-paso" class="admin-inline-form">
+                            <h4 class="h6 fw-bold mb-2"><i class="bi bi-plus-circle text-info"></i> Agregar Paso a la Secuencia</h4>
+                            <div class="row g-2 align-items-end">
+                                <div class="col-12 col-sm-5">
+                                    <label class="form-label small text-secondary mb-1">Movimiento compatible</label>
+                                    <select id="step-form-comando" class="form-select form-select-sm admin-input"></select>
+                                </div>
+                                <div class="col-6 col-sm-3">
+                                    <label class="form-label small text-secondary mb-1">Duración (ms)</label>
+                                    <input type="number" id="step-form-duracion" class="form-control form-control-sm admin-input" value="1500" min="100" max="10000" step="100" required>
+                                </div>
+                                <div class="col-6 col-sm-2">
+                                    <label class="form-label small text-secondary mb-1">Pausa (ms)</label>
+                                    <input type="number" id="step-form-pausa" class="form-control form-control-sm admin-input" value="400" min="0" max="5000" step="100" required>
+                                </div>
+                                <div class="col-12 col-sm-2 d-grid">
+                                    <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">+ Paso</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
     </main>
 
     <footer class="app-footer">
-        Desarrollado por Cynthia Martínez García &middot; 2026 &middot; Control y Monitoreo IoT
+        Desarrollado por Cynthia Martínez García &middot; 2026 &middot; Control, Monitoreo y Administración IoT
     </footer>
 
-    <script type="module" src="assets/js/app.js?v=12"></script>
+    <script type="module" src="assets/js/app.js?v=13"></script>
 </body>
 </html>

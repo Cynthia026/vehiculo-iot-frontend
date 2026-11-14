@@ -908,3 +908,239 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
         margin-bottom: 1rem;
     }
 }
+
+/* ===== Práctica 4.3: Módulo de Administración, Roles y Editor de Demos ===== */
+body[data-view="admin"] {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow-y: auto !important;
+}
+body[data-view="admin"] .app-main {
+    overflow: visible !important;
+    height: auto !important;
+}
+
+.header-unit-select {
+    background: rgba(16, 25, 48, .78);
+    color: var(--text);
+    border: 1px solid rgba(92, 200, 255, .32);
+    border-radius: 999px;
+    padding: .2rem .65rem;
+    font-size: .72rem;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+    max-width: 195px;
+}
+.header-unit-select:focus {
+    border-color: var(--info);
+    box-shadow: 0 0 0 2px rgba(92, 200, 255, .2);
+}
+
+.role-header-btn {
+    cursor: pointer;
+    background: rgba(92, 200, 255, .14) !important;
+    color: #9be2ff !important;
+    border-color: rgba(92, 200, 255, .38) !important;
+}
+.role-header-btn[data-role="ADMIN"] {
+    background: rgba(255, 180, 58, .16) !important;
+    color: #ffd280 !important;
+    border-color: rgba(255, 180, 58, .42) !important;
+}
+.role-header-btn[data-role="INVITADO"] {
+    background: rgba(61, 220, 151, .16) !important;
+    color: #84f5c4 !important;
+    border-color: rgba(61, 220, 151, .42) !important;
+}
+
+.vista-admin {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
+    padding-bottom: 1rem;
+}
+
+.admin-role-section {
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
+}
+
+.admin-role-btn {
+    background: rgba(20, 30, 56, .75);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: .76rem;
+    font-weight: 600;
+    padding: .32rem .8rem;
+    transition: all .15s ease;
+}
+.admin-role-btn:hover {
+    color: var(--text);
+    border-color: rgba(92, 200, 255, .45);
+}
+.admin-role-btn.active {
+    background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
+    color: #fff;
+    border-color: rgba(125, 211, 252, .65);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .35);
+}
+
+.admin-session-banner {
+    background: rgba(10, 16, 34, .65);
+    border: 1px solid rgba(92, 200, 255, .24);
+    border-radius: 12px;
+    padding: .55rem .85rem;
+    font-size: .82rem;
+}
+
+.role-pill {
+    font-size: .7rem;
+    padding: .25rem .6rem;
+    border-radius: 999px;
+}
+.role-admin { background: rgba(255, 180, 58, .22); color: #ffd074; border: 1px solid rgba(255, 180, 58, .45); }
+.role-usuario { background: rgba(92, 200, 255, .22); color: #8ce0ff; border: 1px solid rgba(92, 200, 255, .45); }
+.role-invitado { background: rgba(61, 220, 151, .22); color: #7bf2be; border: 1px solid rgba(61, 220, 151, .45); }
+
+.security-test-output {
+    background: rgba(255, 93, 108, .12);
+    border: 1px solid rgba(255, 93, 108, .38);
+    color: #ffc2c8;
+    border-radius: 10px;
+    padding: .45rem .75rem;
+    font-size: .78rem;
+}
+
+.admin-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+    gap: .75rem;
+}
+.admin-metric-card {
+    background: rgba(15, 23, 44, .68);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: .75rem .95rem;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+.metric-label { font-size: .74rem; color: var(--muted); font-weight: 600; }
+.metric-value { font-size: 1.45rem; font-weight: 700; line-height: 1.15; }
+.metric-sub { font-size: .7rem; color: var(--muted); }
+
+.admin-two-col {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .85rem;
+}
+@media (min-width: 992px) {
+    .admin-two-col {
+        grid-template-columns: 1.15fr .85fr;
+    }
+}
+
+.admin-table-wrap {
+    max-height: 230px;
+    overflow: auto;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: rgba(8, 12, 26, .48);
+}
+
+.admin-inline-form {
+    background: rgba(10, 16, 32, .58);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: .65rem .8rem;
+}
+
+.admin-input {
+    background-color: rgba(16, 25, 48, .85) !important;
+    color: var(--text) !important;
+    border: 1px solid rgba(160, 195, 255, .22) !important;
+    font-size: .78rem !important;
+}
+.admin-input:focus {
+    border-color: var(--info) !important;
+    box-shadow: 0 0 0 2px rgba(92, 200, 255, .18) !important;
+}
+
+.admin-comandos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+    gap: .45rem;
+    max-height: 190px;
+    overflow-y: auto;
+}
+.admin-cmd-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .4rem .65rem;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(16, 24, 46, .62);
+    font-size: .76rem;
+}
+.admin-cmd-chip.is-disabled {
+    opacity: .55;
+}
+
+.user-vehicles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: .8rem;
+}
+.user-vehicle-card {
+    background: rgba(14, 22, 44, .7);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: .85rem 1rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.user-vehicle-card.is-selected {
+    border-color: rgba(92, 200, 255, .6);
+    box-shadow: 0 0 18px rgba(56, 189, 248, .18);
+}
+
+.support-consent-box {
+    background: rgba(8, 13, 28, .65);
+    border: 1px solid rgba(160, 195, 255, .16);
+    border-radius: 10px;
+    padding: .55rem .75rem;
+}
+
+.demo-editor-list {
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.demo-editor-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+    padding: .5rem .75rem;
+    border-radius: 11px;
+    border: 1px solid var(--line);
+    background: rgba(14, 22, 44, .62);
+    cursor: pointer;
+}
+.demo-editor-item.active {
+    border-color: rgba(92, 200, 255, .65);
+    background: rgba(24, 42, 82, .68);
+}
+.demo-editor-item-main {
+    flex: 1;
+}
+.table-danger-row td {
+    background: rgba(255, 93, 108, .09) !important;
+}

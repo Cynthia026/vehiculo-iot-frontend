@@ -1,117 +1,95 @@
-# Vehículo IoT - Plataforma de Control y Monitoreo
+# Vehículo IoT - Plataforma Integral de Control, Monitoreo y Administración
 
-Aplicación web frontend (**SPA / Mobile First**) para el **Control remoto (Práctica 4.1)** y el **Monitoreo en tiempo real (Práctica 4.2)** de un vehículo IoT. Este proyecto consume servicios REST alojados en **AWS (FastAPI)** con persistencia en **Amazon RDS (MySQL)**, mantiene comunicación bidireccional en tiempo real mediante **WebSockets (WSS)** e incorpora gráficos espaciales animados y síntesis de audio nativos del navegador.
+Aplicación web frontend (**SPA / Mobile First**) y plataforma comercial multiusuario que integra **Control remoto (Práctica 4.1)**, **Monitoreo en tiempo real (Práctica 4.2)** y **Administración Comercial con RBAC y Propiedad por Recurso (Práctica 4.3)**. Consume servicios REST alojados en **AWS EC2 (FastAPI)** con persistencia en **Amazon RDS (MySQL)**, comunicación bidireccional mediante **WebSockets (WSS)**, gráficos espaciales animados y síntesis de audio nativos del navegador.
 
 🔗 **Demo desplegada:** [https://cynthia026.github.io/vehiculo-iot-frontend/](https://cynthia026.github.io/vehiculo-iot-frontend/)
 
 ---
 
-## 🚀 Tecnologías y APIs del Navegador Utilizadas
+## 🏢 Modelo de Negocio, Roles y Seguridad por Recurso (RBAC + Anti-BOLA)
 
-* **Frontend Base:** HTML5, CSS3 (Variables CSS, CSS Grid, Flexbox, unidades dinámicas `dvh`), Bootstrap 5, Bootstrap Icons y tipografía *Outfit* (Google Fonts).
-* **Arquitectura JS:** JavaScript Vanilla modular (**ES6 Modules** `import`/`export`) con navegación de vistas tipo **SPA** (*Control* y *Monitoreo*).
-* **Fetch API + `AbortController`:** Comunicación HTTP asíncrona con el backend en AWS; cancela automáticamente peticiones en vuelo si el usuario envía un nuevo movimiento antes de que termine el anterior para evitar saturación.
-* **WebSocket API (`WSS`):** Canal de eventos en tiempo real con reconexión automática y callback desacoplado (`wsManager.onMessage`) para actualizar tanto la interfaz de Control como el módulo de Monitoreo.
-* **Pointer Events API (`pointerdown`, `pointermove`, `pointerup`):** Control unificado de pantalla táctil y ratón con captura de puntero individual (`setPointerCapture`) para operar dos joysticks independientes (*Movimiento* y *Brazo y motores*).
-* **HTML5 Canvas 2D API (`requestAnimationFrame`):** Renderizado de un **fondo astronómico animado** a pantalla completa con mezcla luminosa (`mix-blend-mode: screen`), 3 capas de estrellas con efecto paralaje y centelleo, nebulosas cósmicas flotantes y estrellas fugaces.
-* **Web Audio API (`AudioContext`, `OscillatorNode`, `GainNode`):** Síntesis de sonido en tiempo real directamente en el navegador (sin archivos `.mp3` externos) con efectos diferenciados para cada acción:
-  * **Velocidad:** Barrido ascendente de aceleración.
-  * **Sonido / Claxon:** Doble tono armónico de bocina.
-  * **Luz:** Pulso agudo de interruptor.
-  * **Detener:** Tono descendente de frenado.
-  * **Iniciar / Cancelar DEMO:** Tonos musicales de confirmación o cancelación.
-  * **Joysticks y Pestañas:** Pulso digital suave al cambiar de dirección o de vista.
-* **Vibration API (`navigator.vibrate`):** Respuesta háptica en teléfonos móviles al accionar controles y cambiar la dirección de los joysticks.
+La plataforma simula la operación real de una empresa comercializadora de vehículos IoT conectados a Internet con **3 roles diferenciados** y validación de propiedad por unidad física:
+
+1. **Administrador (`ADMIN` — Empresa Propietaria):**
+   * Gestiona el **Catálogo de Modelos Comerciales** (`EXC-IOT-V1`, `ROV-IOT-V1`), el **Inventario de Unidades Físicas** (con número de serie único y estado comercial `DISPONIBLE`, `EXHIBICION`, `VENDIDO`, `MANTENIMIENTO`), las cuentas de **Clientes Compradores**, las **Asignaciones de Propiedad**, los comandos habilitados por unidad, las demos de fábrica y la **Bitácora de Auditoría**.
+   * **Regla de Privacidad del Comprador:** El Administrador **no puede entrar al control operativo** de una unidad vendida a un cliente salvo que el propietario active explícitamente el interruptor **"Autorizar soporte técnico al Administrador (30 min)"** desde su vista *Mis Vehículos*.
+2. **Usuario Comprador (`USUARIO` — Cliente Propietario):**
+   * Accede exclusivamente a **Mis Vehículos** asignados a su cuenta, su panel de **Control**, su **Monitoreo** en tiempo real, su historial y su **Editor de Demos propias**.
+   * **Protección Anti-BOLA / Anti-IDOR:** Un comprador (`Usuario A`) no puede consultar ni mover vehículos de otro comprador (`Usuario B`) cambiando el `id_vehiculo` (`HTTP 403 Forbidden`).
+3. **Invitado (`INVITADO` — Cliente Potencial / Showroom):**
+   * Explora el **Catálogo Público de Modelos Comerciales** y solicita una **Reserva Temporal Exclusiva (3 minutos)** sobre una unidad en estado **`EXHIBICION`**.
+   * Al agotarse el tiempo o cerrar sesión, la plataforma envía automáticamente el comando prioritario **`Detener`** y libera la reserva. Jamás puede controlar unidades de clientes compradores.
+
+---
+
+## 🚀 Tecnologías y APIs Utilizadas
+
+* **Frontend Base:** HTML5 Semántico, CSS3 (Variables CSS, CSS Grid, Flexbox, unidades dinámicas `dvh`), Bootstrap 5, Bootstrap Icons y tipografía *Outfit* (Google Fonts).
+* **Arquitectura JS:** JavaScript Vanilla modular (**ES6 Modules** `import`/`export`) con navegación SPA (`Control` | `Monitoreo` | `Administración`).
+* **Backend y Base de Datos:** Python 3 + **FastAPI**, **PyMySQL**, 21 **Stored Procedures** + consultas parametrizadas seguras en **Amazon RDS (MySQL 8.0)**, autenticación **JWT (`HS256`)** y WebSockets por sala de vehículo (`id_vehiculo`).
+* **HTML5 Canvas 2D API + Web Audio API + Vibration API:** Fondo astronómico animado y efectos de sonido sintetizados en tiempo real para cada acción y joystick.
 
 ---
 
 ## 📁 Estructura del Proyecto
 
-El proyecto sigue una arquitectura modular con separación de responsabilidades dentro de la carpeta `assets/`:
-
+### Frontend (`vehiculo-iot-frontend`)
 ```text
 vehiculo-iot-frontend/
 ├── assets/
-│   ├── Favicon_Iot_vehiculo.png  # Icono circular con fondo transparente (pestaña y encabezado)
-│   ├── Favicon_Iot_vehiculo.jpg  # Imagen fuente original del icono
-│   ├── favicon.ico               # Icono estándar para navegadores
+│   ├── Favicon_Iot_vehiculo.png  # Icono oficial (pestaña, encabezado y Splash Screen)
 │   ├── css/
-│   │   └── styles.css            # Estilos responsivos (1 sola pantalla en laptop y móvil vertical/horizontal), joysticks, monitoreo y tema espacial
+│   │   └── styles.css            # Estilos responsivos (1 pantalla en Control/Monitoreo y panel Admin)
 │   ├── data/
-│   │   └── .gitkeep              # Directorio reservado para catálogos estáticos futuros
+│   │   └── .gitkeep
 │   └── js/
-│       ├── config.js             # Constantes globales (URLs de API REST, WSS e ID del vehículo)
-│       ├── api.js                # Cliente HTTP (Fetch + AbortController) para Control y Monitoreo
-│       ├── websocket.js          # Gestión de conexión WSS, reconexión y callback en tiempo real (onMessage)
-│       ├── joystick.js           # Clase Joystick: trigonometría, zona muerta, límites y retorno al centro
-│       ├── ui.js                 # Control del DOM, vistas SPA, tabla/tarjeta de Monitoreo, conversión horaria UTC a local, Canvas 2D y Web Audio API
-│       └── app.js                # Orquestador principal, reconciliación REST + WSS, verificación de RDS y enlace de eventos
-├── index.html                    # Estructura principal con pestañas Control / Monitoreo, indicadores de estado y vistas modulares
-└── README.md                     # Documentación técnica del proyecto
+│       ├── config.js             # Configuración dinámica de unidad activa, URLs REST/WSS y token JWT
+│       ├── api.js                # Cliente HTTP (Fetch + AbortController + Bearer JWT) para 4.1, 4.2 y 4.3
+│       ├── websocket.js          # Gestor WSS por unidad con reconexión y callback en tiempo real
+│       ├── joystick.js           # Clase Joystick: trigonometría, zona muerta y retorno con Detener
+│       ├── ui.js                 # Control del DOM, Splash Screen, vistas SPA, Canvas 2D y Web Audio API
+│       ├── admin.js              # Controlador de Administración (RBAC, BOLA, inventario, demos y auditoría)
+│       └── app.js                # Orquestador principal, reconciliación REST + WSS y prioridad de Detener
+├── index.html                    # Aplicación SPA con las 3 vistas: Control, Monitoreo y Administración
+└── README.md                     # Documentación técnica y matriz de pruebas
+```
+
+### Backend y Migraciones SQL (`vehiculo-iot-api`)
+```text
+vehiculo-iot-api/
+├── app/
+│   ├── config.py                 # Variables de entorno (.env) para Amazon RDS
+│   ├── database.py               # Ejecución de los 21 Stored Procedures y consultas parametrizadas
+│   ├── security.py               # JWT HS256, hash SHA-256, RBAC y guardia anti-BOLA (verificar_acceso_vehiculo)
+│   ├── routers/
+│   │   ├── auth.py               # Login, sesión temporal de Invitado (3 min), perfil y logout seguro
+│   │   ├── administracion.py     # Dashboard, modelos comerciales, unidades, clientes, asignaciones y auditoría
+│   │   ├── mis_vehiculos.py      # Mis vehículos del comprador, switch de soporte y catálogo de exhibición
+│   │   ├── vehiculos.py          # CRUD base de vehículos (SPs originales + autorización)
+│   │   ├── comandos.py           # Catálogo y activación de comandos por vehículo
+│   │   ├── telemetria.py         # Estado, historial (máx. 10) y ejecución de movimiento con prioridad Detener
+│   │   └── demos.py              # CRUD de demos, pasos ordenados, ejecución asíncrona, cancelación y WSS
+│   └── schemas/                  # Esquemas Pydantic de validación
+├── migrations/
+│   ├── 00_precheck_and_counts.sql        # Conteo e inventario previo en RDS
+│   ├── V001__4_3_administracion_up.sql   # Migración incremental no destructiva (tablas, columnas y semilla)
+│   ├── V001__4_3_administracion_down.sql # Script de reversión para entornos de prueba
+│   └── 02_postcheck_validation.sql       # Verificación post-migración de conteos y Stored Procedures
+└── main.py                       # Punto de entrada FastAPI, CORS, /api/health y Swagger UI personalizado
 ```
 
 ---
 
-## ⚙️ ¿Cómo Funciona la Aplicación?
+## 🧪 Matriz de Casos de Prueba Verificables (Rúbrica 4.3)
 
-### 1. Pantalla de Inicio (Splash Screen), Conectividad e Inicialización (`app.js` y `ui.js`)
-* **Splash Screen Animada (`#splash-screen`):** Al abrir la aplicación se presenta una pantalla de bienvenida espacial con resplandor radial, el logotipo oficial del vehículo con animación flotante, tipografía espaciada (`VEHÍCULO IOT · CONTROL EXCAVADORA IOT`) y una barra de progreso animada antes de dar paso a la vista de **Control**.
-* **Indicadores Independientes en Cabecera:**
-  * **WSS:** Estado en vivo del WebSocket (`Conectando...`, `En línea`, `Reconectando...` o `Desconectado`).
-  * **AWS:** Estado del servidor FastAPI (`Disponible` o `No disponible`).
-  * **RDS:** Consulta el endpoint `/api/health` para verificar la conexión con **Amazon RDS (MySQL)**.
-* **Modo Sin Conexión (`is-offline`):** Al abrir la aplicación se dibuja de inmediato toda la interfaz. Si AWS no está disponible, los controles permanecen visibles pero deshabilitados y el sistema reintenta conectarse automáticamente cada **8 segundos**.
-
-### 2. Módulo de Control (Práctica 4.1)
-* **Doble Joystick Tipo Dial (`joystick.js`):**
-  * **Joystick 1 (Movimiento):** Calcula el ángulo con `Math.atan2(dy, dx)` y traduce las 4 direcciones a `AVANZAR`, `RETROCEDER`, `GIRAR_IZQUIERDA` y `GIRAR_DERECHA`.
-  * **Joystick 2 (Brazo y motores):** Traduce las direcciones a `SUBIR_BRAZO`, `BAJAR_BRAZO`, `MOTOR_IZQUIERDA` y `MOTOR_DERECHA`.
-  * Ambos incluyen zona muerta (20 px), iluminación del cuadrante activo (`data-dir`) y retorno automático al centro enviando `Detener` al soltar.
-* **Accesorios y Secuencias DEMO en Tiempo Real:**
-  * Los comandos de accesorios (*Velocidad*, *Sonido*, *Luz*) se renderizan dinámicamente con iconos y efectos de sonido propios.
-  * Durante la ejecución de una **Secuencia DEMO**, el cliente escucha los eventos `movimiento_demo` del WebSocket, traduce el `comando_en_ejecucion` al nombre del movimiento, muestra en pantalla `Enviando: <MOVIMIENTO>` e ilumina en tiempo real la dirección correspondiente en el joystick.
-
-### 3. Módulo de Monitoreo en Tiempo Real (Práctica 4.2)
-* **Navegación SPA (`Control` | `Monitoreo`):** Permite alternar entre la vista de operación y la vista de telemetría sin recargar la página.
-* **Tarjeta de Último Movimiento:** Muestra el comando más reciente con icono dinámico, código de color semántico (verde para avance/luz, ámbar para retroceso/velocidad, cian para giros/brazo/motores, rojo para detener) y sello de registro en RDS.
-* **Tabla de Últimos 10 Movimientos:** Presenta el historial reciente (`#`, `Movimiento`, `Fecha`, `Hora`) almacenado en **Amazon RDS**.
-* **Reconciliación Híbrida REST + WebSocket (`procesarMensajeWSS`):**
-  * Al abrir la pestaña **Monitoreo**, se consultan en paralelo `GET /api/telemetria/estado/1` y `GET /api/telemetria/historial/1`.
-  * Cuando llega un evento `movimiento_individual` por WebSocket, la tarjeta de **Último movimiento** se actualiza de forma instantánea y, tras una breve espera de `600 ms` (para asegurar el `COMMIT` en MySQL RDS), se refresca automáticamente la tabla de los últimos 10 movimientos.
-  * Cuando llega un evento `movimiento_demo`, se actualiza en vivo la tarjeta de **Último movimiento** indicando `(DEMO)` sin recargar la tabla de historial individual.
-* **Conversión Automática de Zona Horaria (UTC → Hora Local):** Las marcas de tiempo enviadas en UTC por AWS/RDS se normalizan en el cliente para mostrar siempre la fecha (`DD/MM/YYYY`) y hora (`HH:MM:SS`) en el huso horario local del usuario.
-
-### 4. Diseño Responsivo en Una Sola Pantalla (Laptop y Móvil Vertical/Horizontal)
-* El diseño se adapta automáticamente a pantallas de **escritorio/laptop**, **móvil vertical** y **móvil horizontal (`orientation: landscape`)**, manteniendo toda la aplicación contenida en una sola pantalla (`100dvh`) sin desplazamiento vertical.
-
----
-
-## 🔌 Puntos de Integración (API REST y WSS)
-
-La aplicación se conecta con los siguientes servicios en AWS:
-
-* **Base URL (REST):** `https://api-vehiculo-iot.duckdns.org`
-* **WebSocket (WSS):** `wss://api-vehiculo-iot.duckdns.org/api/demos/ws/1`
-* **Salud del Servidor y Amazon RDS:** `GET /api/health`
-* **Catálogo de Comandos:** `GET /api/comandos/vehiculo/1`
-* **Ejecución de Movimiento / Accesorios:** `POST /api/telemetria/movimiento?id_vehiculo=1&id_comando={id}&origen=API_POST`
-* **Catálogo de Secuencias DEMO:** `GET /api/demos/vehiculo/1`
-* **Iniciar Secuencia DEMO:** `POST /api/demos/{id_demo}/ejecutar?id_vehiculo=1`
-* **Cancelar Secuencia DEMO:** `POST /api/demos/vehiculo/1/cancelar`
-* **Último Estado del Vehículo (Monitoreo):** `GET /api/telemetria/estado/1`
-* **Historial de Últimos 10 Movimientos (Monitoreo):** `GET /api/telemetria/historial/1`
-
----
-
-## 💻 Ejecución Local
-
-1. Clonar este repositorio:
-   ```bash
-   git clone https://github.com/Cynthia026/vehiculo-iot-frontend.git
-   ```
-2. Abrir la carpeta `vehiculo-iot-frontend` en **Visual Studio Code**.
-3. Debido al uso nativo de **ES6 Modules** (`type="module"`), es necesario servir los archivos mediante un servidor HTTP local (por ejemplo, con la extensión **Live Server** de VS Code).
-4. Hacer clic derecho sobre `index.html` y seleccionar **"Open with Live Server"**.
+| Caso de Prueba | Rol Activo | Acción a Realizar | Resultado Esperado |
+| :--- | :--- | :--- | :--- |
+| **1. Alta y asignación de unidad** | `ADMIN` | En *Administración*, registrar una unidad física con número de serie y asignarla a un comprador. | La unidad se guarda en RDS, cambia a estado `VENDIDO` y se registra en la Bitácora de Auditoría. |
+| **2. Operación del propietario** | `USUARIO` (Cynthia) | Seleccionar *Unidad #1* en *Mis Vehículos* y enviar movimientos desde *Control*. | Movimiento aceptado (`200 OK`), reflejado por WSS en *Monitoreo* y persistido en los últimos 10 de RDS. |
+| **3. Bloqueo de acceso cruzado (BOLA/IDOR)** | `USUARIO` (Cynthia) | Pulsar *"Probar BOLA: Usuario A → Unidad Ajena (#3)"* o intentar operar la unidad de Carlos. | Bloqueado con `403 Forbidden` y alerta registrada en la Bitácora de Auditoría. |
+| **4. Protección de unidad vendida ante Admin** | `ADMIN` | Intentar operar *Unidad #1 (VENDIDO)* cuando `soporte_autorizado = OFF`. | Bloqueado con `403 Forbidden` hasta que la propietaria active *"Autorizar soporte técnico (30 min)"*. |
+| **5. Sesión temporal de Invitado y paro seguro** | `INVITADO` | Iniciar reserva de exhibición (3 min), probar la unidad *Showroom* y finalizar o dejar expirar el reloj. | El invitado sólo ve la unidad `EXHIBICION`; al finalizar/expirar se envía `Detener` automáticamente. |
+| **6. Editor de Demos y prioridad de Detener** | `USUARIO` / `ADMIN` | Crear demo, agregar pasos (`100–10,000 ms`), reordenar con `↑`/`↓`, ejecutar en *Control* y pulsar **Detener**. | Los pasos persisten en RDS (`demo_movimientos`) y **Detener** cancela de inmediato la rutina en curso. |
 
 ---
 

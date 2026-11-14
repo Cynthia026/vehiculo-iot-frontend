@@ -63,31 +63,37 @@ class UIController {
         }, 1950);
     }
 
-    // --- NAVEGACIÓN DE VISTAS (Control / Monitoreo) ---
+    // --- NAVEGACIÓN DE VISTAS (Control / Monitoreo / Administración) ---
     switchView(viewName) {
         this.playSound('tap');
         this.vibrar(10);
 
         const vistaControl = document.getElementById('vista-control');
         const vistaMonitoreo = document.getElementById('vista-monitoreo');
+        const vistaAdmin = document.getElementById('vista-admin');
         const btnControl = document.getElementById('btn-tab-control');
         const btnMonitoreo = document.getElementById('btn-tab-monitoreo');
+        const btnAdmin = document.getElementById('btn-tab-admin');
 
         if (!vistaControl || !vistaMonitoreo) return;
 
-        if (viewName === 'control') {
-            vistaControl.classList.remove('d-none');
-            vistaMonitoreo.classList.add('d-none');
-            btnControl?.classList.add('active');
-            btnMonitoreo?.classList.remove('active');
-        } else {
-            vistaControl.classList.add('d-none');
-            vistaMonitoreo.classList.remove('d-none');
-            btnControl?.classList.remove('active');
-            btnMonitoreo?.classList.add('active');
-            if (this.onSwitchToMonitoreo) {
-                this.onSwitchToMonitoreo();
-            }
+        document.body.dataset.view = viewName;
+
+        vistaControl.classList.toggle('d-none', viewName !== 'control');
+        vistaMonitoreo.classList.toggle('d-none', viewName !== 'monitoreo');
+        if (vistaAdmin) {
+            vistaAdmin.classList.toggle('d-none', viewName !== 'admin');
+        }
+
+        btnControl?.classList.toggle('active', viewName === 'control');
+        btnMonitoreo?.classList.toggle('active', viewName === 'monitoreo');
+        btnAdmin?.classList.toggle('active', viewName === 'admin');
+
+        if (viewName === 'monitoreo' && this.onSwitchToMonitoreo) {
+            this.onSwitchToMonitoreo();
+        }
+        if (viewName === 'admin' && this.onSwitchToAdmin) {
+            this.onSwitchToAdmin();
         }
     }
 
