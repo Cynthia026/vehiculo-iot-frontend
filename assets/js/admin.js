@@ -1,104 +1,77 @@
 // assets/js/admin.js
-import { api } from './api.js?v=13';
-import { CONFIG } from './config.js?v=13';
-import { ui, normalizar } from './ui.js?v=13';
+import { api } from './api.js?v=15';
+import { CONFIG } from './config.js?v=15';
+import { ui, normalizar } from './ui.js?v=15';
 
-const STORAGE_KEY = 'vehiculo_iot_admin_state_v1';
+const SESSION_TOKEN_KEY = 'vehiculo_iot_jwt_session';
 
-// Estado inicial sincronizado con RDS (se enriquece con GET /api/vehiculos/, /api/demos/, etc.)
-const DEFAULT_STATE = {
-    modelos: [
-        {
-            id_modelo: 1,
-            codigo_modelo: 'EXC-IOT-V1',
-            nombre: 'Excavadora IoT',
-            descripcion: 'Vehículo oruga con brazo hidráulico articulado, giro de cabina y accesorios luminosos/sonoros.',
-            microcontrolador_default: 'ESP8266',
-            tiene_brazo: true,
-            tiene_motores_giro: true,
-            activo: true
+// Limpiar cualquier estado antiguo que se haya guardado en localStorage en versiones previas
+try {
+    localStorage.removeItem('vehiculo_iot_admin_state_v1');
+} catch (_) {}
+
+// Estado base en memoria (con soporte_autorizado = false en Unidad #1 para cumplir el Caso de Prueba 4 -> 403)
+function crearEstadoInicialMemoria() {
+    return {
+        modelos: [
+            {
+                id_modelo: 1,
+                codigo_modelo: 'EXC-IOT-V1',
+                nombre: 'Excavadora IoT',
+                descripcion: 'Vehículo oruga con brazo hidráulico articulado, giro de cabina y accesorios luminosos/sonoros.',
+                microcontrolador_default: 'ESP8266',
+                tiene_brazo: true,
+                tiene_motores_giro: true,
+                activo: true
+            },
+            {
+                id_modelo: 2,
+                codigo_modelo: 'ROV-IOT-V1',
+                nombre: 'Rover Explorador IoT',
+                descripcion: 'Vehículo compacto de exploración 4WD con tracción diferencial, faros LED y telemetría.',
+                microcontrolador_default: 'ESP8266',
+                tiene_brazo: false,
+                tiene_motores_giro: true,
+                activo: true
+            }
+        ],
+        clientes: [],
+        metaUnidades: {
+            1: {
+                id_modelo: 1,
+                numero_serie: 'SN-EXC-0001',
+                estado_comercial: 'VENDIDO',
+                id_propietario: 2,
+                soporte_autorizado: false,
+                soporte_expira_en: null
+            },
+            2: {
+                id_modelo: 1,
+                numero_serie: 'SN-EXC-DEMO-02',
+                estado_comercial: 'EXHIBICION',
+                id_propietario: null,
+                soporte_autorizado: false,
+                soporte_expira_en: null
+            },
+            3: {
+                id_modelo: 2,
+                numero_serie: 'SN-ROV-0003',
+                estado_comercial: 'VENDIDO',
+                id_propietario: 3,
+                soporte_autorizado: false,
+                soporte_expira_en: null
+            }
         },
-        {
-            id_modelo: 2,
-            codigo_modelo: 'ROV-IOT-V1',
-            nombre: 'Rover Explorador IoT',
-            descripcion: 'Vehículo compacto de exploración 4WD con tracción diferencial, faros LED y telemetría.',
-            microcontrolador_default: 'ESP8266',
-            tiene_brazo: false,
-            tiene_motores_giro: true,
-            activo: true
-        }
-    ],
-    clientes: [
-        {
-            id_usuario: 2,
-            nombre: 'Cynthia Martínez García',
-            email: 'cynthia@cliente.com',
-            rol: 'USUARIO',
-            activo: true
-        },
-        {
-            id_usuario: 3,
-            nombre: 'Carlos Mendoza (Comprador B)',
-            email: 'carlos@cliente.com',
-            rol: 'USUARIO',
-            activo: true
-        }
-    ],
-    // Metadatos comerciales por id_vehiculo para distinguir Modelo Comercial de Unidad Física
-    metaUnidades: {
-        1: {
-            id_modelo: 1,
-            numero_serie: 'SN-EXC-0001',
-            estado_comercial: 'VENDIDO',
-            id_propietario: 2,
-            soporte_autorizado: false,
-            soporte_expira_en: null
-        },
-        2: {
-            id_modelo: 1,
-            numero_serie: 'SN-EXC-DEMO-02',
-            estado_comercial: 'EXHIBICION',
-            id_propietario: null,
-            soporte_autorizado: true,
-            soporte_expira_en: null
-        },
-        3: {
-            id_modelo: 2,
-            numero_serie: 'SN-ROV-0003',
-            estado_comercial: 'VENDIDO',
-            id_propietario: 3,
-            soporte_autorizado: false,
-            soporte_expira_en: null
-        }
-    },
-    metaDemos: {},
-    reservaInvitado: null,
-    auditoria: [
-        {
-            id_auditoria: 1,
-            actor: 'Administrador General',
-            rol: 'ADMIN',
-            accion: 'INICIO_PLATAFORMA',
-            entidad: 'vehiculos',
-            id_recurso: 1,
-            detalle: 'Inventario inicial sincronizado con Amazon RDS (Unidad #1 asignada a Cynthia Martínez García).',
-            fecha_hora: new Date().toISOString()
-        }
-    ]
-};
+        reservaInvitado: null,
+        auditoria: []
+    };
+}
 
 class AdminManager {
     constructor() {
-        this.state = this._loadState();
-        // Por defecto inicia como la propietaria de la Unidad 1 para que Control y Monitoreo 4.1/4.2 operen de inmediato
-        this.sesion = {
-            id_usuario: 2,
-            nombre: 'Cynthia Martínez García',
-            email: 'cynthia@cliente.com',
-            rol: 'USUARIO',
-            nombre_rol: 'Usuario Comprador'
-        };
+        this.state = crearEstadoInicialMemoria();
+        // Sin sesión fingida al arrancar: se restaura desde sessionStorage si hay un JWT real o pide iniciar sesión
+        this.sesion = null;
         this.unidadesRds = [];
         this.comandosUnidadAdmin = [];
         this.demosUnidadEditor = [];
@@ -106,69 +79,62 @@ class AdminManager {
         this.idUnidadComandosSel = 1;
         this.idDemoSeleccionada = null;
         this.guestInterval = null;
-        this.onUnitChanged = null; // Callback hacia app.js cuando cambia la unidad activa
-        this.onStopVehicle = null; // Callback hacia app.js para detener físicamente la unidad
+        this.onUnitChanged = null;
+        this.onStopVehicle = null;
     }
 
-    _loadState() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return structuredClone(DEFAULT_STATE);
-            const parsed = JSON.parse(raw);
-            return {
-                ...structuredClone(DEFAULT_STATE),
-                ...parsed,
-                metaUnidades: { ...DEFAULT_STATE.metaUnidades, ...(parsed.metaUnidades || {}) }
-            };
-        } catch (_) {
-            return structuredClone(DEFAULT_STATE);
-        }
-    }
-
-    _saveState() {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-        } catch (_) {}
-    }
-
-    registrarEventoAuditoria(accion, entidad, idRecurso, detalle) {
-        const nuevo = {
-            id_auditoria: (this.state.auditoria[0]?.id_auditoria || 0) + 1,
-            actor: this.sesion?.nombre || 'Visitante',
-            rol: this.sesion?.rol || 'INVITADO',
-            accion,
-            entidad,
-            id_recurso: idRecurso,
-            detalle,
-            fecha_hora: new Date().toISOString()
-        };
-        this.state.auditoria = [nuevo, ...this.state.auditoria].slice(0, 40);
-        this._saveState();
-        this.renderAuditoria();
-        this.renderMetricas();
-    }
-
-    init(callbacks = {}) {
+    async init(callbacks = {}) {
         this.onUnitChanged = callbacks.onUnitChanged || null;
         this.onStopVehicle = callbacks.onStopVehicle || null;
         this._bindEvents();
+
+        // Si existe un JWT en sessionStorage, validarlo de verdad contra GET /api/auth/me
+        const savedToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
+        if (savedToken) {
+            CONFIG.setAuthToken(savedToken);
+            try {
+                const me = await api.obtenerPerfilActual();
+                if (me && me.usuario) {
+                    this.sesion = me.usuario;
+                    if (Array.isArray(me.unidades) && me.unidades.length > 0) {
+                        this.unidadesRds = me.unidades;
+                    }
+                    if (this.sesion.rol === 'INVITADO' && me.usuario.segundos_restantes) {
+                        this.state.reservaInvitado = {
+                            id_vehiculo: me.usuario.id_vehiculo_reservado || 2,
+                            nombre_vehiculo: me.unidades?.[0]?.nombre || 'Unidad Exhibición',
+                            operador: me.usuario.nombre,
+                            expira_ts: Date.now() + Number(me.usuario.segundos_restantes) * 1000,
+                            activa: true
+                        };
+                        this._iniciarRelojInvitado();
+                    }
+                }
+            } catch (_) {
+                sessionStorage.removeItem(SESSION_TOKEN_KEY);
+                CONFIG.setAuthToken(null);
+                this.sesion = null;
+            }
+        }
+
         this.actualizarBadgeSesionCabecera();
     }
 
-    // Verifica en el cliente + backend si el usuario actual puede controlar una unidad física
+    // Valida permisos tanto antes de enviar como recibiendo el rechazo real del servidor FastAPI
     verificarPermisoOperacion(idVehiculo = CONFIG.VEHICULO_ID, silencioso = false) {
         const unidad = this.obtenerUnidadEnriquecida(idVehiculo);
+
+        if (!this.sesion) {
+            // Si aún no ha iniciado sesión en Administración, permitimos operar Control básico si el backend lo acepta,
+            // o avisamos si intenta operar una unidad restringida.
+            return { ok: true, codigo: 200 };
+        }
+
         const rol = this.sesion.rol;
 
         if (rol === 'USUARIO') {
-            if (Number(unidad.id_propietario) !== Number(this.sesion.id_usuario)) {
+            if (unidad.id_propietario && Number(unidad.id_propietario) !== Number(this.sesion.id_usuario)) {
                 if (!silencioso) {
-                    this.registrarEventoAuditoria(
-                        'ACCESO_CRUZADO_BLOQUEADO',
-                        'vehiculos',
-                        idVehiculo,
-                        `[403 BOLA/IDOR] ${this.sesion.nombre} intentó controlar la unidad #${idVehiculo} (${unidad.nombre}) perteneciente a otro comprador.`
-                    );
                     ui.showFeedback(`403 Bloqueado (BOLA): La unidad #${idVehiculo} no pertenece a tu cuenta`, 'danger', 4000);
                 }
                 return { ok: false, codigo: 403, motivo: 'Esta unidad pertenece a otro comprador (BOLA/IDOR).' };
@@ -179,12 +145,6 @@ class AdminManager {
         if (rol === 'INVITADO') {
             if (unidad.estado_comercial !== 'EXHIBICION') {
                 if (!silencioso) {
-                    this.registrarEventoAuditoria(
-                        'INVITADO_UNIDAD_PRIVADA_BLOQUEADO',
-                        'vehiculos',
-                        idVehiculo,
-                        `[403 RBAC] Invitado intentó operar unidad privada #${idVehiculo} (${unidad.estado_comercial}).`
-                    );
                     ui.showFeedback('403 Bloqueado: Invitado sólo puede operar unidades de EXHIBICIÓN', 'danger', 4000);
                 }
                 return { ok: false, codigo: 403, motivo: 'El rol Invitado sólo puede operar unidades en EXHIBICIÓN.' };
@@ -202,12 +162,6 @@ class AdminManager {
         if (rol === 'ADMIN') {
             if (unidad.estado_comercial === 'VENDIDO' && unidad.id_propietario && !unidad.soporte_autorizado) {
                 if (!silencioso) {
-                    this.registrarEventoAuditoria(
-                        'ADMIN_CONTROL_SIN_SOPORTE',
-                        'vehiculos',
-                        idVehiculo,
-                        `[403 PRIVACIDAD] Admin intentó mover unidad vendida #${idVehiculo} (${unidad.nombre}) sin consentimiento de soporte del comprador.`
-                    );
                     ui.showFeedback('403 Privacidad: El comprador debe activar "Autorizar Soporte" en Mis Vehículos', 'danger', 4500);
                 }
                 return { ok: false, codigo: 403, motivo: 'El Administrador requiere autorización explícita de soporte del propietario.' };
@@ -230,12 +184,12 @@ class AdminManager {
         const meta = this.state.metaUnidades[idVehiculo] || {
             id_modelo: 1,
             numero_serie: `SN-IOT-000${idVehiculo}`,
-            estado_comercial: idVehiculo === 1 ? 'VENDIDO' : 'EXHIBICION',
+            estado_comercial: idVehiculo === 1 ? 'VENDIDO' : 'DISPONIBLE',
             id_propietario: idVehiculo === 1 ? 2 : null,
             soporte_autorizado: false
         };
         const propietario = this.state.clientes.find(c => Number(c.id_usuario) === Number(meta.id_propietario));
-        const modeloObj = this.state.modelos.find(m => Number(m.id_modelo) === Number(meta.id_modelo));
+        const modeloObj = this.state.modelos.find(m => Number(m.id_modelo) === Number(base.id_modelo || meta.id_modelo || 1));
 
         return {
             ...base,
@@ -246,7 +200,9 @@ class AdminManager {
             id_propietario: base.id_propietario !== undefined ? base.id_propietario : meta.id_propietario,
             nombre_propietario: base.nombre_propietario || propietario?.nombre || null,
             email_propietario: base.email_propietario || propietario?.email || null,
-            soporte_autorizado: Boolean(base.soporte_autorizado ?? meta.soporte_autorizado)
+            soporte_autorizado: Boolean(
+                base.soporte_autorizado !== undefined ? base.soporte_autorizado : meta.soporte_autorizado
+            )
         };
     }
 
@@ -259,161 +215,160 @@ class AdminManager {
 
     obtenerUnidadesVisiblesPorRol() {
         const todas = this.obtenerTodasLasUnidadesEnriquecidas();
+        if (!this.sesion) {
+            return todas.filter(u => u.id_vehiculo === 1 || u.estado_comercial === 'EXHIBICION');
+        }
         if (this.sesion.rol === 'ADMIN') {
             return todas;
         }
         if (this.sesion.rol === 'USUARIO') {
             return todas.filter(u => Number(u.id_propietario) === Number(this.sesion.id_usuario));
         }
-        // INVITADO: únicamente unidades en EXHIBICION
         return todas.filter(u => u.estado_comercial === 'EXHIBICION');
     }
 
     async sincronizarDesdeRds() {
         try {
-            // Intentar primero el endpoint unificado 4.3 si ya fue desplegado en EC2
-            try {
-                if (this.sesion.rol === 'ADMIN' && CONFIG.AUTH_TOKEN) {
+            if (this.sesion && this.sesion.rol === 'ADMIN' && CONFIG.AUTH_TOKEN) {
+                try {
                     const dash = await api.obtenerDashboardAdmin();
-                    if (dash && Array.isArray(dash.unidades)) {
-                        this.unidadesRds = dash.unidades;
+                    if (dash) {
+                        if (Array.isArray(dash.unidades)) {
+                            this.unidadesRds = dash.unidades;
+                            dash.unidades.forEach(u => {
+                                this.state.metaUnidades[u.id_vehiculo] = {
+                                    id_modelo: u.id_modelo || 1,
+                                    numero_serie: u.numero_serie,
+                                    estado_comercial: u.estado_comercial,
+                                    id_propietario: u.id_propietario,
+                                    soporte_autorizado: Boolean(u.soporte_autorizado),
+                                    soporte_expira_en: u.soporte_expira_en
+                                };
+                            });
+                        }
                         if (Array.isArray(dash.modelos) && dash.modelos.length) this.state.modelos = dash.modelos;
-                        if (Array.isArray(dash.clientes) && dash.clientes.length) this.state.clientes = dash.clientes;
-                        if (Array.isArray(dash.auditoria) && dash.auditoria.length) this.state.auditoria = dash.auditoria;
-                        this._saveState();
+                        if (Array.isArray(dash.clientes)) this.state.clientes = dash.clientes;
+                        if (Array.isArray(dash.auditoria)) this.state.auditoria = dash.auditoria;
+                        this.renderizarTodo();
+                        return;
                     }
+                } catch (e) {
+                    console.warn('Endpoint /api/admin/dashboard pendiente de actualizar en EC2:', e.message);
                 }
-            } catch (_) {
-                // Si EC2 aún corre la versión base de los 21 SPs, usamos GET /api/vehiculos/
             }
+
+            if (this.sesion && this.sesion.rol === 'USUARIO' && CONFIG.AUTH_TOKEN) {
+                try {
+                    const mis = await api.obtenerMisVehiculos();
+                    if (Array.isArray(mis)) {
+                        this.unidadesRds = mis;
+                        mis.forEach(u => {
+                            this.state.metaUnidades[u.id_vehiculo] = {
+                                id_modelo: u.id_modelo || 1,
+                                numero_serie: u.numero_serie,
+                                estado_comercial: u.estado_comercial || 'VENDIDO',
+                                id_propietario: this.sesion.id_usuario,
+                                soporte_autorizado: Boolean(u.soporte_autorizado),
+                                soporte_expira_en: u.soporte_expira_en
+                            };
+                        });
+                        this.renderizarTodo();
+                        return;
+                    }
+                } catch (_) {}
+            }
+
+            try {
+                const cat = await api.obtenerCatalogoPublico();
+                if (cat && Array.isArray(cat.modelos) && cat.modelos.length) {
+                    this.state.modelos = cat.modelos;
+                }
+            } catch (_) {}
 
             const listaRds = await api.obtenerVehiculos();
             if (Array.isArray(listaRds) && listaRds.length > 0) {
                 this.unidadesRds = listaRds;
-                listaRds.forEach((v) => {
-                    if (!this.state.metaUnidades[v.id_vehiculo]) {
-                        this.state.metaUnidades[v.id_vehiculo] = {
-                            id_modelo: 1,
-                            numero_serie: `SN-EXC-000${v.id_vehiculo}`,
-                            estado_comercial: v.id_vehiculo === 1 ? 'VENDIDO' : 'DISPONIBLE',
-                            id_propietario: v.id_vehiculo === 1 ? 2 : null,
-                            soporte_autorizado: false
-                        };
-                    }
-                });
-                this._saveState();
             }
         } catch (err) {
-            console.warn('Usando inventario cacheado:', err.message);
+            console.warn('Error sincronizando con RDS:', err.message);
         }
 
         this.renderizarTodo();
     }
 
-    async cambiarPerfilActivo(tipoPerfil, opciones = {}) {
-        ui.playSound('tap');
-        clearInterval(this.guestInterval);
+    // Autenticación real contra POST /api/auth/login (sin contraseñas hardcodeadas en el código)
+    async iniciarSesionConCredenciales(email, password) {
+        const res = await api.login(email, password);
+        CONFIG.setAuthToken(res.access_token);
+        sessionStorage.setItem(SESSION_TOKEN_KEY, res.access_token);
 
-        if (tipoPerfil === 'ADMIN') {
-            try {
-                const res = await api.login('admin@vehiculoiot.com', opciones.password || 'Admin123*');
-                CONFIG.setAuthToken(res.access_token);
-            } catch (_) {
-                CONFIG.setAuthToken(null);
-            }
-            this.sesion = {
-                id_usuario: 1,
-                nombre: 'Administrador General',
-                email: 'admin@vehiculoiot.com',
-                rol: 'ADMIN',
-                nombre_rol: 'Administrador (Empresa)'
-            };
-            this.registrarEventoAuditoria('LOGIN_ROL', 'usuarios', 1, 'Sesión iniciada como ADMINISTRADOR (Empresa IoT).');
-        } else if (tipoPerfil === 'USUARIO_A') {
-            try {
-                const res = await api.login('cynthia@cliente.com', opciones.password || 'Cliente123*');
-                CONFIG.setAuthToken(res.access_token);
-            } catch (_) {
-                CONFIG.setAuthToken(null);
-            }
-            this.sesion = {
-                id_usuario: 2,
-                nombre: 'Cynthia Martínez García',
-                email: 'cynthia@cliente.com',
-                rol: 'USUARIO',
-                nombre_rol: 'Usuario Comprador (Titular Unidad #1)'
-            };
-            this.registrarEventoAuditoria('LOGIN_ROL', 'usuarios', 2, 'Sesión iniciada como USUARIO COMPRADOR: Cynthia Martínez García.');
-        } else if (tipoPerfil === 'USUARIO_B') {
-            try {
-                const res = await api.login('carlos@cliente.com', opciones.password || 'Cliente123*');
-                CONFIG.setAuthToken(res.access_token);
-            } catch (_) {
-                CONFIG.setAuthToken(null);
-            }
-            this.sesion = {
-                id_usuario: 3,
-                nombre: 'Carlos Mendoza (Comprador B)',
-                email: 'carlos@cliente.com',
-                rol: 'USUARIO',
-                nombre_rol: 'Usuario Comprador (Titular Unidad #3)'
-            };
-            this.registrarEventoAuditoria('LOGIN_ROL', 'usuarios', 3, 'Sesión iniciada como USUARIO COMPRADOR: Carlos Mendoza.');
-        } else if (tipoPerfil === 'CLIENTE_CUSTOM' && opciones.cliente) {
-            const c = opciones.cliente;
-            this.sesion = {
-                id_usuario: c.id_usuario,
-                nombre: c.nombre,
-                email: c.email,
-                rol: 'USUARIO',
-                nombre_rol: 'Usuario Comprador'
-            };
-            this.registrarEventoAuditoria('LOGIN_ROL', 'usuarios', c.id_usuario, `Sesión iniciada como comprador: ${c.nombre}.`);
-        } else if (tipoPerfil === 'INVITADO') {
-            const nombreVis = opciones.nombreVisitante || 'Visitante Showroom';
-            this.sesion = {
-                id_usuario: null,
-                nombre: nombreVis,
-                email: 'invitado@vehiculoiot.com',
-                rol: 'INVITADO',
-                nombre_rol: 'Invitado (Sesión Temporal)'
-            };
-            this.iniciarReservaInvitado(nombreVis);
+        this.sesion = res.usuario;
+        if (Array.isArray(res.unidades) && res.unidades.length > 0) {
+            this.unidadesRds = res.unidades;
+            res.unidades.forEach(u => {
+                this.state.metaUnidades[u.id_vehiculo] = {
+                    id_modelo: u.id_modelo || 1,
+                    numero_serie: u.numero_serie,
+                    estado_comercial: u.estado_comercial,
+                    id_propietario: u.id_propietario ?? (this.sesion.rol === 'USUARIO' ? this.sesion.id_usuario : null),
+                    soporte_autorizado: Boolean(u.soporte_autorizado)
+                };
+            });
+            await this.seleccionarUnidadActiva(res.unidades[0].id_vehiculo, false);
         }
 
-        // Seleccionar automáticamente la primera unidad permitida para este rol
-        const permitidas = this.obtenerUnidadesVisiblesPorRol();
-        if (permitidas.length > 0) {
-            await this.seleccionarUnidadActiva(permitidas[0].id_vehiculo, false);
-        }
-
+        await this.sincronizarDesdeRds();
         this.actualizarBadgeSesionCabecera();
-        this.renderizarTodo();
-        ui.showFeedback(`Sesión activa: ${this.sesion.nombre} (${this.sesion.rol})`, 'success', 2600);
+        ui.playSound('start');
+        ui.showFeedback(`Bienvenido, ${this.sesion.nombre} (${this.sesion.rol})`, 'success', 2800);
     }
 
-    iniciarReservaInvitado(nombreVisitante = 'Visitante Showroom') {
-        const unidadesExh = this.obtenerTodasLasUnidadesEnriquecidas().filter(u => u.estado_comercial === 'EXHIBICION');
-        const unidadExh = unidadesExh[0] || this.obtenerUnidadEnriquecida(2);
-        const duracionSeg = 180; // 3 minutos de sesión exclusiva
+    // Sesión temporal real de Invitado contra POST /api/auth/invitado
+    async iniciarSesionInvitadoReal(nombreVisitante = 'Visitante Showroom') {
+        const res = await api.iniciarSesionInvitado(nombreVisitante);
+        CONFIG.setAuthToken(res.access_token);
+        sessionStorage.setItem(SESSION_TOKEN_KEY, res.access_token);
+
+        this.sesion = res.usuario;
+        const idExh = res.reserva?.id_vehiculo || 2;
+        const segRestantes = Number(res.reserva?.segundos_restantes || res.expires_in || 180);
 
         this.state.reservaInvitado = {
-            id_vehiculo: unidadExh.id_vehiculo,
-            nombre_vehiculo: unidadExh.nombre,
+            id_vehiculo: idExh,
+            nombre_vehiculo: res.reserva?.nombre_vehiculo || 'Unidad 2 - Showroom',
             operador: nombreVisitante,
-            expira_ts: Date.now() + duracionSeg * 1000,
+            expira_ts: Date.now() + segRestantes * 1000,
             activa: true
         };
-        this._saveState();
 
-        this.registrarEventoAuditoria(
-            'RESERVA_EXHIBICION',
-            'sesiones_control',
-            unidadExh.id_vehiculo,
-            `Reserva exclusiva de exhibición (3 min) asignada a '${nombreVisitante}' sobre ${unidadExh.nombre}.`
-        );
+        if (Array.isArray(res.unidades) && res.unidades.length > 0) {
+            this.unidadesRds = res.unidades;
+        }
 
         this._iniciarRelojInvitado();
+        await this.seleccionarUnidadActiva(idExh, false);
+        this.actualizarBadgeSesionCabecera();
+        this.renderizarTodo();
+        ui.playSound('start');
+        ui.showFeedback(`Reserva exclusiva de exhibición iniciada (3 min)`, 'success', 3000);
+    }
+
+    async cerrarSesionActual() {
+        clearInterval(this.guestInterval);
+        try {
+            if (CONFIG.AUTH_TOKEN) {
+                await api.logout();
+            }
+        } catch (_) {}
+
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
+        CONFIG.setAuthToken(null);
+        this.sesion = null;
+        this.state.reservaInvitado = null;
+        this.actualizarBadgeSesionCabecera();
+        this.renderizarTodo();
+        ui.playSound('cancel');
+        ui.showFeedback('Sesión cerrada correctamente', 'info', 2200);
     }
 
     _iniciarRelojInvitado() {
@@ -434,8 +389,8 @@ class AdminManager {
             const seg = String(restSeg % 60).padStart(2, '0');
 
             if (badge) badge.textContent = `${min}:${seg}`;
-            if (headerRole && this.sesion.rol === 'INVITADO') {
-                headerRole.textContent = `Invitado (${min}:${seg})`;
+            if (headerRole && this.sesion?.rol === 'INVITADO') {
+                headerRole.textContent = `INVITADO (${min}:${seg})`;
             }
 
             if (restSeg <= 0) {
@@ -452,23 +407,13 @@ class AdminManager {
         const res = this.state.reservaInvitado;
         if (res && res.activa) {
             res.activa = false;
-            this._saveState();
-
-            // Seguridad física: al expirar o liberar la sesión de invitado, enviamos Detener
             if (this.onStopVehicle) {
-                try {
-                    await this.onStopVehicle();
-                } catch (_) {}
+                try { await this.onStopVehicle(); } catch (_) {}
             }
-
-            this.registrarEventoAuditoria(
-                porExpiracion ? 'EXPIRACION_INVITADO_STOP' : 'LIBERACION_INVITADO_STOP',
-                'sesiones_control',
-                res.id_vehiculo,
-                porExpiracion
-                    ? `Tiempo agotado en unidad #${res.id_vehiculo}: orden automática de DETENER enviada y reserva liberada.`
-                    : `Visitante liberó la unidad de exhibición #${res.id_vehiculo} y se envió DETENER.`
-            );
+            try { await api.logout(); } catch (_) {}
+            sessionStorage.removeItem(SESSION_TOKEN_KEY);
+            CONFIG.setAuthToken(null);
+            this.sesion = null;
 
             ui.showFeedback(
                 porExpiracion
@@ -479,16 +424,13 @@ class AdminManager {
             );
         }
         this.actualizarBadgeSesionCabecera();
-        this.renderPanelInvitado();
+        this.renderizarTodo();
     }
 
     async seleccionarUnidadActiva(idVehiculo, mostrarAviso = true) {
         const numId = Number(idVehiculo) || 1;
         const unidad = this.obtenerUnidadEnriquecida(numId);
 
-        // Para llamadas a RDS (que tiene registrada físicamente la Unidad 1 o las creadas en vehiculos),
-        // si la unidad virtual de prueba (ej. 2 o 3) aún no existe en la tabla vehiculos de RDS,
-        // sincronizamos el canal o usamos el ID real disponible.
         const existeEnRds = this.unidadesRds.some(v => Number(v.id_vehiculo) === numId);
         CONFIG.VEHICULO_ACTIVO_LOGICO = numId;
         CONFIG.setVehiculoId(existeEnRds ? numId : 1);
@@ -517,13 +459,14 @@ class AdminManager {
         const roleBadge = document.getElementById('header-role-text');
         const roleBtn = document.getElementById('btn-role-switcher');
         if (roleBadge) {
-            roleBadge.textContent = `${this.sesion.rol}: ${this.sesion.nombre.split(' ')[0]}`;
+            roleBadge.textContent = this.sesion
+                ? `${this.sesion.rol}: ${this.sesion.nombre.split(' ')[0]}`
+                : 'Iniciar Sesión';
         }
         if (roleBtn) {
-            roleBtn.dataset.role = this.sesion.rol;
+            roleBtn.dataset.role = this.sesion ? this.sesion.rol : 'NONE';
         }
 
-        // Actualizar selector de unidades en cabecera según permisos del rol
         const selHeader = document.getElementById('header-unit-select');
         if (selHeader) {
             const visibles = this.obtenerUnidadesVisiblesPorRol();
@@ -539,25 +482,33 @@ class AdminManager {
     renderizarTodo() {
         this.actualizarBadgeSesionCabecera();
 
-        // Mostrar/ocultar secciones según el rol activo
+        const loginBox = document.getElementById('admin-auth-login-box');
+        const loggedBox = document.getElementById('admin-auth-logged-box');
         const secAdmin = document.getElementById('admin-role-section-admin');
         const secUser = document.getElementById('admin-role-section-usuario');
         const secGuest = document.getElementById('admin-role-section-invitado');
+        const secEditor = document.getElementById('panel-editor-demos');
 
-        if (secAdmin) secAdmin.classList.toggle('d-none', this.sesion.rol !== 'ADMIN');
-        if (secUser) secUser.classList.toggle('d-none', this.sesion.rol !== 'USUARIO');
-        if (secGuest) secGuest.classList.toggle('d-none', this.sesion.rol !== 'INVITADO');
+        const autenticado = Boolean(this.sesion && CONFIG.AUTH_TOKEN);
 
-        // Resaltar píldora de rol activo
-        document.querySelectorAll('[data-switch-profile]').forEach(btn => {
-            const code = btn.getAttribute('data-switch-profile');
-            const isMatch =
-                (code === 'ADMIN' && this.sesion.rol === 'ADMIN') ||
-                (code === 'USUARIO_A' && this.sesion.rol === 'USUARIO' && this.sesion.id_usuario === 2) ||
-                (code === 'USUARIO_B' && this.sesion.rol === 'USUARIO' && this.sesion.id_usuario === 3) ||
-                (code === 'INVITADO' && this.sesion.rol === 'INVITADO');
-            btn.classList.toggle('active', isMatch);
-        });
+        if (loginBox) loginBox.classList.toggle('d-none', autenticado);
+        if (loggedBox) loggedBox.classList.toggle('d-none', !autenticado);
+
+        if (!autenticado) {
+            // Si no ha iniciado sesión, mostramos el catálogo de exhibición público y el formulario de login
+            if (secAdmin) secAdmin.classList.add('d-none');
+            if (secUser) secUser.classList.add('d-none');
+            if (secGuest) secGuest.classList.remove('d-none');
+            if (secEditor) secEditor.classList.add('d-none');
+            this.renderPanelInvitado();
+            return;
+        }
+
+        const rol = this.sesion.rol;
+        if (secAdmin) secAdmin.classList.toggle('d-none', rol !== 'ADMIN');
+        if (secUser) secUser.classList.toggle('d-none', rol !== 'USUARIO');
+        if (secGuest) secGuest.classList.toggle('d-none', rol !== 'INVITADO');
+        if (secEditor) secEditor.classList.toggle('d-none', rol === 'INVITADO');
 
         const bannerRol = document.getElementById('admin-current-session-banner');
         if (bannerRol) {
@@ -565,18 +516,24 @@ class AdminManager {
             bannerRol.innerHTML = `
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <div>
-                        <span class="badge role-pill role-${this.sesion.rol.toLowerCase()} me-2">${this.sesion.rol}</span>
+                        <span class="badge role-pill role-${rol.toLowerCase()} me-2">${rol}</span>
                         <strong>${this.sesion.nombre}</strong>
                         <span class="text-secondary ms-1">(${this.sesion.email})</span>
+                        <span class="badge bg-success ms-2"><i class="bi bi-key-fill"></i> JWT Verificado</span>
                     </div>
-                    <div class="small text-info">
-                        <i class="bi bi-shield-lock-fill"></i> Unidades autorizadas para tu cuenta: <strong>${unidades.length}</strong>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="small text-info">
+                            <i class="bi bi-shield-lock-fill"></i> Unidades autorizadas: <strong>${unidades.length}</strong>
+                        </span>
+                        <button type="button" id="btn-logout-session" class="btn btn-sm btn-outline-danger py-0 px-2">
+                            <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                        </button>
                     </div>
                 </div>
             `;
         }
 
-        if (this.sesion.rol === 'ADMIN') {
+        if (rol === 'ADMIN') {
             this.renderMetricas();
             this.renderTablaModelos();
             this.renderTablaUnidades();
@@ -584,13 +541,13 @@ class AdminManager {
             this.renderComandosUnidadAdmin(this.idUnidadComandosSel);
             this.renderAuditoria();
             this.cargarDemosParaEditor(this.idUnidadComandosSel);
-        } else if (this.sesion.rol === 'USUARIO') {
+        } else if (rol === 'USUARIO') {
             this.renderMisVehiculosUsuario();
             const misUnidades = this.obtenerUnidadesVisiblesPorRol();
             if (misUnidades.length > 0) {
                 this.cargarDemosParaEditor(misUnidades[0].id_vehiculo);
             }
-        } else if (this.sesion.rol === 'INVITADO') {
+        } else if (rol === 'INVITADO') {
             this.renderPanelInvitado();
         }
     }
@@ -607,7 +564,7 @@ class AdminManager {
             <div class="admin-metric-card">
                 <span class="metric-label"><i class="bi bi-boxes"></i> Modelos Comerciales</span>
                 <strong class="metric-value text-info">${this.state.modelos.length}</strong>
-                <small class="metric-sub">En catálogo activo</small>
+                <small class="metric-sub">En catálogo RDS</small>
             </div>
             <div class="admin-metric-card">
                 <span class="metric-label"><i class="bi bi-truck-flatbed"></i> Unidades Físicas</span>
@@ -622,7 +579,7 @@ class AdminManager {
             <div class="admin-metric-card">
                 <span class="metric-label"><i class="bi bi-people-fill"></i> Clientes Compradores</span>
                 <strong class="metric-value text-warning">${this.state.clientes.length}</strong>
-                <small class="metric-sub">${this.state.auditoria.length} eventos en bitácora</small>
+                <small class="metric-sub">${this.state.auditoria.length} eventos en bitácora RDS</small>
             </div>
         `;
     }
@@ -682,17 +639,18 @@ class AdminManager {
                         <td>${soporteHtml}</td>
                         <td>
                             <div class="d-flex flex-wrap gap-1">
-                                <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-action="intentar-operar-admin" data-id="${u.id_vehiculo}" title="Abrir en Control">
+                                <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-action="intentar-operar-admin" data-id="${u.id_vehiculo}" title="Intentar operar en Control">
                                     <i class="bi bi-controller"></i> Operar
                                 </button>
                                 ${u.id_propietario ? `
                                     <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="revocar-unidad" data-id="${u.id_vehiculo}" title="Revocar asignación">
                                         <i class="bi bi-person-dash"></i> Liberar
                                     </button>
-                                ` : ''}
-                                <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" data-action="cambiar-exhibicion" data-id="${u.id_vehiculo}" title="Alternar Exhibición/Disponible">
-                                    <i class="bi bi-display"></i> Exhibición
-                                </button>
+                                ` : `
+                                    <button type="button" class="btn btn-sm btn-outline-light py-0 px-2" data-action="cambiar-exhibicion" data-id="${u.id_vehiculo}" title="Alternar Exhibición/Disponible">
+                                        <i class="bi bi-display"></i> ${u.estado_comercial === 'EXHIBICION' ? 'A Disponible' : 'A Exhibición'}
+                                    </button>
+                                `}
                             </div>
                         </td>
                     </tr>
@@ -721,26 +679,25 @@ class AdminManager {
         const unidades = this.obtenerTodasLasUnidadesEnriquecidas();
 
         if (tbody) {
-            tbody.innerHTML = this.state.clientes.map(c => {
-                const propias = unidades.filter(u => Number(u.id_propietario) === Number(c.id_usuario));
-                return `
-                    <tr>
-                        <td>#${c.id_usuario}</td>
-                        <td class="fw-semibold">${c.nombre}</td>
-                        <td>${c.email}</td>
-                        <td>
-                            ${propias.length
-                                ? propias.map(p => `<span class="badge bg-success me-1">#${p.id_vehiculo} ${p.nombre}</span>`).join('')
-                                : '<span class="text-secondary small">Ninguna asignada</span>'}
-                        </td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-action="simular-cliente" data-id="${c.id_usuario}">
-                                <i class="bi bi-box-arrow-in-right"></i> Ver como este cliente
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+            if (this.state.clientes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center text-secondary py-2">Sin clientes cargados.</td></tr>`;
+            } else {
+                tbody.innerHTML = this.state.clientes.map(c => {
+                    const propias = unidades.filter(u => Number(u.id_propietario) === Number(c.id_usuario));
+                    return `
+                        <tr>
+                            <td>#${c.id_usuario}</td>
+                            <td class="fw-semibold">${c.nombre}</td>
+                            <td>${c.email}</td>
+                            <td>
+                                ${propias.length
+                                    ? propias.map(p => `<span class="badge bg-success me-1">#${p.id_vehiculo} ${p.nombre}</span>`).join('')
+                                    : '<span class="text-secondary small">Ninguna asignada</span>'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
         }
 
         if (selectCliente) {
@@ -756,8 +713,7 @@ class AdminManager {
         if (!cont) return;
 
         try {
-            const idRds = this.unidadesRds.some(v => Number(v.id_vehiculo) === this.idUnidadComandosSel) ? this.idUnidadComandosSel : 1;
-            const comandos = await api.obtenerComandos(idRds);
+            const comandos = await api.obtenerComandos(this.idUnidadComandosSel);
             this.comandosUnidadAdmin = Array.isArray(comandos) ? comandos : [];
             const unidad = this.obtenerUnidadEnriquecida(this.idUnidadComandosSel);
             const modeloObj = this.state.modelos.find(m => Number(m.id_modelo) === Number(unidad.id_modelo));
@@ -792,13 +748,17 @@ class AdminManager {
     renderAuditoria() {
         const tbody = document.getElementById('tabla-admin-auditoria');
         if (!tbody) return;
-        tbody.innerHTML = this.state.auditoria.slice(0, 15).map(ev => {
+        if (!this.state.auditoria || this.state.auditoria.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-secondary py-2">Sin eventos registrados aún en RDS.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = this.state.auditoria.slice(0, 20).map(ev => {
             const { fecha, hora } = ui.formatearFechaHora(ev.fecha_hora);
             const isAlert = /BLOQUEADO|SIN_SOPORTE/.test(ev.accion);
             return `
                 <tr class="${isAlert ? 'table-danger-row' : ''}">
                     <td><span class="badge ${isAlert ? 'bg-danger' : 'bg-secondary'}">${ev.accion}</span></td>
-                    <td><strong>${ev.actor}</strong> <small class="text-secondary">(${ev.rol})</small></td>
+                    <td><strong>${ev.actor || 'Usuario'}</strong> <small class="text-secondary">(${ev.rol})</small></td>
                     <td>${ev.detalle || ''}</td>
                     <td class="text-nowrap small">${fecha} ${hora}</td>
                 </tr>
@@ -806,7 +766,6 @@ class AdminManager {
         }).join('');
     }
 
-    // --- VISTA ROL USUARIO COMPRADOR: MIS VEHÍCULOS Y SOPORTE ---
     renderMisVehiculosUsuario() {
         const cont = document.getElementById('usuario-mis-vehiculos-grid');
         if (!cont) return;
@@ -816,7 +775,7 @@ class AdminManager {
             cont.innerHTML = `
                 <div class="admin-empty-state">
                     <i class="bi bi-car-front fs-2 text-secondary"></i>
-                    <p class="mb-0 mt-2">Aún no tienes unidades asignadas a tu cuenta de comprador.</p>
+                    <p class="mb-0 mt-2">Aún no tienes unidades asignadas a tu cuenta de comprador en RDS.</p>
                 </div>
             `;
             return;
@@ -848,8 +807,8 @@ class AdminManager {
                         </div>
                         <small class="d-block text-secondary mt-1">
                             ${u.soporte_autorizado
-                                ? '<span class="text-warning"><i class="bi bi-unlock-fill"></i> El Administrador tiene permiso temporal para probar tu unidad.</span>'
-                                : '<span class="text-success"><i class="bi bi-shield-lock-fill"></i> Control privado: ni el Administrador ni otros usuarios pueden mover tu vehículo.</span>'}
+                                ? '<span class="text-warning"><i class="bi bi-unlock-fill"></i> El Administrador tiene permiso temporal en RDS para probar tu unidad.</span>'
+                                : '<span class="text-success"><i class="bi bi-shield-lock-fill"></i> Control privado: ni el Administrador ni otros usuarios pueden mover tu vehículo (403).</span>'}
                         </small>
                     </div>
 
@@ -864,17 +823,15 @@ class AdminManager {
         }).join('');
     }
 
-    // --- EDITOR DE DEMOS Y SECUENCIAS ORDENADAS (PERSISTIDO EN RDS) ---
     async cargarDemosParaEditor(idVehiculo = 1) {
-        const idRds = this.unidadesRds.some(v => Number(v.id_vehiculo) === Number(idVehiculo)) ? Number(idVehiculo) : 1;
         const contDemos = document.getElementById('editor-demos-lista');
         const selectCmdPaso = document.getElementById('step-form-comando');
         if (!contDemos) return;
 
         try {
             const [demos, comandos] = await Promise.all([
-                api.obtenerDemos(idRds),
-                api.obtenerComandos(idRds)
+                api.obtenerDemos(idVehiculo),
+                api.obtenerComandos(idVehiculo)
             ]);
             this.demosUnidadEditor = Array.isArray(demos) ? demos : [];
             const comandosActivos = (Array.isArray(comandos) ? comandos : []).filter(c => c.activo !== false && c.activo !== 0);
@@ -897,8 +854,7 @@ class AdminManager {
             }
 
             contDemos.innerHTML = this.demosUnidadEditor.map(d => {
-                const meta = this.state.metaDemos[d.id_demo] || {};
-                const tipo = d.tipo_demo || meta.tipo_demo || (d.id_demo === 1 ? 'EMPRESA' : 'PRIVADA');
+                const tipo = d.tipo_demo || (d.id_demo === 1 ? 'EMPRESA' : 'PRIVADA');
                 const sel = Number(d.id_demo) === Number(this.idDemoSeleccionada);
                 return `
                     <div class="demo-editor-item ${sel ? 'active' : ''}">
@@ -985,7 +941,6 @@ class AdminManager {
         `).join('');
     }
 
-    // --- VISTA ROL INVITADO: CATÁLOGO PÚBLICO Y PRUEBA TEMPORAL DE EXHIBICIÓN ---
     renderPanelInvitado() {
         const catCont = document.getElementById('invitado-catalogo-grid');
         const boxReserva = document.getElementById('invitado-reserva-status');
@@ -1012,7 +967,7 @@ class AdminManager {
             boxReserva.innerHTML = activa ? `
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <div>
-                        <span class="badge bg-success me-2"><i class="bi bi-broadcast-pin"></i> RESERVA EXCLUSIVA ACTIVA</span>
+                        <span class="badge bg-success me-2"><i class="bi bi-broadcast-pin"></i> RESERVA EXCLUSIVA ACTIVA EN RDS</span>
                         <strong>${res.nombre_vehiculo}</strong> · Operador: <span class="text-info">${res.operador}</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -1028,8 +983,8 @@ class AdminManager {
             ` : `
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                     <div>
-                        <span class="badge bg-secondary me-2">SIN RESERVA ACTIVA</span>
-                        <span>Inicia una sesión temporal de 3 minutos para probar la unidad de exhibición sin afectar unidades de clientes.</span>
+                        <span class="badge bg-secondary me-2">MODO VISITANTE / PROSPECTO</span>
+                        <span>Puedes consultar el catálogo público o iniciar una reserva temporal exclusiva de 3 minutos en la unidad de exhibición.</span>
                     </div>
                     <button type="button" class="btn btn-sm btn-success fw-bold" data-action="renovar-reserva-invitado">
                         <i class="bi bi-play-circle-fill"></i> Solicitar Reserva de Exhibición (3 min)
@@ -1040,7 +995,6 @@ class AdminManager {
     }
 
     _bindEvents() {
-        // Cambio de unidad desde el selector rápido de cabecera
         const selHeader = document.getElementById('header-unit-select');
         if (selHeader) {
             selHeader.addEventListener('change', (e) => {
@@ -1048,24 +1002,33 @@ class AdminManager {
             });
         }
 
-        // Botón en cabecera para ir rápido a la pestaña Administración / Perfil
         const btnRole = document.getElementById('btn-role-switcher');
         if (btnRole) {
             btnRole.addEventListener('click', () => {
-                const tabAdmin = document.getElementById('btn-tab-admin');
-                if (tabAdmin) tabAdmin.click();
+                document.getElementById('btn-tab-admin')?.click();
             });
         }
 
-        // Delegación de clics dentro de #vista-admin
+        // Botones para rellenar únicamente el correo de prueba (NUNCA la contraseña)
+        document.querySelectorAll('[data-fill-email]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const emailInput = document.getElementById('auth-login-email');
+                const passInput = document.getElementById('auth-login-password');
+                if (emailInput) {
+                    emailInput.value = btn.getAttribute('data-fill-email') || '';
+                }
+                if (passInput) {
+                    passInput.focus();
+                }
+            });
+        });
+
         const vistaAdmin = document.getElementById('vista-admin');
         if (!vistaAdmin) return;
 
         vistaAdmin.addEventListener('click', async (e) => {
-            const btnProfile = e.target.closest('[data-switch-profile]');
-            if (btnProfile) {
-                const code = btnProfile.getAttribute('data-switch-profile');
-                await this.cambiarPerfilActivo(code);
+            if (e.target.closest('#btn-logout-session')) {
+                await this.cerrarSesionActual();
                 return;
             }
 
@@ -1075,43 +1038,37 @@ class AdminManager {
             const id = Number(actionEl.getAttribute('data-id'));
 
             if (action === 'intentar-operar-admin') {
+                // Valida en el servidor FastAPI enviando una consulta/operación sobre la unidad
                 const check = this.verificarPermisoOperacion(id, false);
-                if (!check.ok) return;
+                if (!check.ok) {
+                    // También disparamos petición real al backend para que quede registrada en bitacora_auditoria de RDS
+                    try { await api.ejecutarMovimiento(1, id); } catch (_) {}
+                    await this.sincronizarDesdeRds();
+                    return;
+                }
                 await this.seleccionarUnidadActiva(id, true);
                 document.getElementById('btn-tab-control')?.click();
             }
 
             if (action === 'revocar-unidad') {
-                if (this.state.metaUnidades[id]) {
-                    this.state.metaUnidades[id].id_propietario = null;
-                    this.state.metaUnidades[id].estado_comercial = 'DISPONIBLE';
-                    this.state.metaUnidades[id].soporte_autorizado = false;
-                    this._saveState();
+                try {
+                    await api.revocarAsignacion(id, 'DISPONIBLE');
+                    await this.sincronizarDesdeRds();
+                    ui.showFeedback(`Unidad #${id} liberada a estado DISPONIBLE en RDS`, 'warning', 2500);
+                } catch (err) {
+                    ui.showFeedback(`Error al liberar unidad: ${err.message}`, 'danger');
                 }
-                try { await api.revocarAsignacion(id, 'DISPONIBLE'); } catch (_) {}
-                this.registrarEventoAuditoria('REVOCACION_UNIDAD', 'asignaciones_vehiculo', id, `Asignación de la unidad #${id} revocada -> pasa a DISPONIBLE.`);
-                this.renderizarTodo();
-                ui.showFeedback(`Unidad #${id} liberada a estado DISPONIBLE`, 'warning', 2500);
             }
 
             if (action === 'cambiar-exhibicion') {
-                if (!this.state.metaUnidades[id]) this.state.metaUnidades[id] = {};
-                const actual = this.state.metaUnidades[id].estado_comercial;
-                const nuevo = actual === 'EXHIBICION' ? 'DISPONIBLE' : 'EXHIBICION';
-                this.state.metaUnidades[id].estado_comercial = nuevo;
-                this.state.metaUnidades[id].id_propietario = null;
-                this._saveState();
-                this.registrarEventoAuditoria('CAMBIO_ESTADO_COMERCIAL', 'vehiculos', id, `Unidad #${id} cambiada a estado ${nuevo}.`);
-                this.renderizarTodo();
-                ui.showFeedback(`Unidad #${id} marcada como ${nuevo}`, 'info', 2500);
-            }
-
-            if (action === 'simular-cliente') {
-                const cliente = this.state.clientes.find(c => Number(c.id_usuario) === id);
-                if (cliente) {
-                    if (id === 2) await this.cambiarPerfilActivo('USUARIO_A');
-                    else if (id === 3) await this.cambiarPerfilActivo('USUARIO_B');
-                    else await this.cambiarPerfilActivo('CLIENTE_CUSTOM', { cliente });
+                const unidad = this.obtenerUnidadEnriquecida(id);
+                const nuevo = unidad.estado_comercial === 'EXHIBICION' ? 'DISPONIBLE' : 'EXHIBICION';
+                try {
+                    await api.revocarAsignacion(id, nuevo);
+                    await this.sincronizarDesdeRds();
+                    ui.showFeedback(`Unidad #${id} cambiada a ${nuevo} en RDS`, 'info', 2500);
+                } catch (err) {
+                    ui.showFeedback(`Error al cambiar estado comercial: ${err.message}`, 'danger');
                 }
             }
 
@@ -1139,7 +1096,6 @@ class AdminManager {
             if (action === 'eliminar-demo-editor') {
                 try {
                     await api.eliminarDemo(id);
-                    this.registrarEventoAuditoria('ELIMINAR_DEMO', 'demos', id, `Secuencia DEMO #${id} eliminada de RDS.`);
                     ui.showFeedback('Secuencia DEMO eliminada de RDS', 'warning', 2400);
                     await this.cargarDemosParaEditor(CONFIG.VEHICULO_ID);
                     if (this.onUnitChanged) await this.onUnitChanged(CONFIG.VEHICULO_ID);
@@ -1197,55 +1153,53 @@ class AdminManager {
             }
 
             if (action === 'renovar-reserva-invitado') {
-                this.iniciarReservaInvitado(this.sesion.nombre || 'Visitante Showroom');
-                this.renderPanelInvitado();
-                ui.showFeedback('Reserva exclusiva de exhibición activada por 3 minutos', 'success', 2600);
+                const inputVis = document.getElementById('guest-login-name');
+                const nombreVis = inputVis?.value?.trim() || 'Visitante Showroom';
+                try {
+                    await this.iniciarSesionInvitadoReal(nombreVis);
+                } catch (err) {
+                    ui.showFeedback(err.message || 'No fue posible reservar la unidad de exhibición', 'danger', 4000);
+                }
             }
 
-            // Laboratorio de Pruebas de Seguridad (RBAC / BOLA / Soporte)
+            // Pruebas de Autorización ejecutadas contra el servidor FastAPI (devuelven 401/403 reales desde RDS)
             if (action === 'test-bola-cruzado') {
-                const idAjeno = this.sesion.id_usuario === 2 ? 3 : 1;
-                this.verificarPermisoOperacion(idAjeno, false);
-                this._mostrarResultadoPruebaSeguridad(
-                    `[PRUEBA BOLA/IDOR] Usuario actual (${this.sesion.nombre}) intentó enviar comando a Unidad #${idAjeno} (ajena) → BLOQUEADO HTTP 403 Forbidden.`
-                );
+                const idAjeno = this.sesion?.id_usuario === 3 ? 1 : 3;
+                try {
+                    await api.ejecutarMovimiento(1, idAjeno);
+                    this._mostrarResultadoPruebaSeguridad(`Respuesta inesperada: la petición sobre Unidad #${idAjeno} fue aceptada.`);
+                } catch (err) {
+                    this._mostrarResultadoPruebaSeguridad(
+                        `[BACKEND HTTP ${err.status || 403}] ${err.message}`
+                    );
+                    await this.sincronizarDesdeRds();
+                }
             }
 
             if (action === 'test-admin-sin-soporte') {
-                const meta1 = this.state.metaUnidades[1];
-                if (meta1 && !meta1.soporte_autorizado) {
-                    this.registrarEventoAuditoria(
-                        'ADMIN_CONTROL_SIN_SOPORTE',
-                        'vehiculos',
-                        1,
-                        '[403 PRIVACIDAD] Prueba verificada: Admin bloqueado al intentar operar Unidad #1 (Vendida a Cynthia) sin soporte autorizado.'
-                    );
-                    ui.showFeedback('403 Bloqueado: Admin no puede controlar unidad vendida sin soporte autorizado', 'danger', 4000);
+                try {
+                    await api.ejecutarMovimiento(1, 1);
+                    this._mostrarResultadoPruebaSeguridad(`La Unidad #1 tiene actualmente el soporte técnico autorizado por el propietario.`);
+                } catch (err) {
                     this._mostrarResultadoPruebaSeguridad(
-                        `[PRUEBA PRIVACIDAD COMPRADOR] Admin intentó mover Unidad #1 (Vendida) con soporte_autorizado=OFF → BLOQUEADO HTTP 403 Forbidden.`
+                        `[BACKEND HTTP ${err.status || 403}] ${err.message}`
                     );
-                } else {
-                    this._mostrarResultadoPruebaSeguridad(
-                        `[AVISO] Actualmente la Unidad #1 tiene el soporte autorizado ACTIVO. Desactívalo en la cuenta de Cynthia para probar el bloqueo 403.`
-                    );
+                    await this.sincronizarDesdeRds();
                 }
             }
 
             if (action === 'test-invitado-unidad-vendida') {
-                this.registrarEventoAuditoria(
-                    'INVITADO_UNIDAD_PRIVADA_BLOQUEADO',
-                    'vehiculos',
-                    1,
-                    '[403 RBAC] Prueba verificada: Invitado rechazado al intentar acceder a Unidad #1 (Vendida).'
-                );
-                ui.showFeedback('403 Bloqueado: Invitado no puede acceder a unidades de clientes compradores', 'danger', 4000);
-                this._mostrarResultadoPruebaSeguridad(
-                    `[PRUEBA AISLAMIENTO INVITADO] Invitado intentó operar Unidad #1 (VENDIDO) → BLOQUEADO HTTP 403 Forbidden.`
-                );
+                try {
+                    await api.ejecutarMovimiento(1, 1);
+                    this._mostrarResultadoPruebaSeguridad(`Respuesta inesperada en unidad #1.`);
+                } catch (err) {
+                    this._mostrarResultadoPruebaSeguridad(
+                        `[BACKEND HTTP ${err.status || 403}] ${err.message}`
+                    );
+                }
             }
         });
 
-        // Cambios en switches (soporte técnico del comprador y activación de comandos)
         vistaAdmin.addEventListener('change', async (e) => {
             const target = e.target;
             if (target.id === 'cmd-admin-unit-select') {
@@ -1258,28 +1212,22 @@ class AdminManager {
 
             if (action === 'toggle-soporte-propietario') {
                 const autorizado = Boolean(target.checked);
-                if (!this.state.metaUnidades[id]) this.state.metaUnidades[id] = {};
-                this.state.metaUnidades[id].soporte_autorizado = autorizado;
-                this._saveState();
                 try {
                     await api.configurarSoporte(id, autorizado, 30);
-                } catch (_) {}
-                this.registrarEventoAuditoria(
-                    'SOPORTE_AUTORIZACION',
-                    'vehiculos',
-                    id,
-                    autorizado
-                        ? `Propietario (${this.sesion.nombre}) AUTORIZÓ soporte técnico al Administrador sobre la unidad #${id} por 30 min.`
-                        : `Propietario (${this.sesion.nombre}) REVOCÓ el acceso de soporte técnico sobre la unidad #${id}.`
-                );
-                this.renderMisVehiculosUsuario();
-                ui.showFeedback(
-                    autorizado
-                        ? 'Soporte técnico autorizado al Administrador por 30 min'
-                        : 'Soporte técnico revocado: control exclusivo privado activado',
-                    autorizado ? 'warning' : 'success',
-                    3000
-                );
+                    if (!this.state.metaUnidades[id]) this.state.metaUnidades[id] = {};
+                    this.state.metaUnidades[id].soporte_autorizado = autorizado;
+                    await this.sincronizarDesdeRds();
+                    ui.showFeedback(
+                        autorizado
+                            ? 'Soporte técnico autorizado al Administrador en RDS por 30 min'
+                            : 'Soporte técnico revocado en RDS: control exclusivo privado activado',
+                        autorizado ? 'warning' : 'success',
+                        3000
+                    );
+                } catch (err) {
+                    target.checked = !autorizado;
+                    ui.showFeedback(`Error al actualizar soporte en RDS: ${err.message}`, 'danger');
+                }
             }
 
             if (action === 'toggle-cmd-activo') {
@@ -1293,12 +1241,6 @@ class AdminManager {
                         descripcion: cmd.descripcion || '',
                         activo: nuevoActivo
                     });
-                    this.registrarEventoAuditoria(
-                        'CONFIG_COMANDO',
-                        'comandos',
-                        id,
-                        `Comando '${cmd.nombre}' ${nuevoActivo ? 'HABILITADO' : 'DESHABILITADO'} en RDS.`
-                    );
                     ui.showFeedback(`Comando ${cmd.nombre}: ${nuevoActivo ? 'Habilitado' : 'Deshabilitado'}`, 'info', 2200);
                     await this.renderComandosUnidadAdmin(this.idUnidadComandosSel);
                     if (this.onUnitChanged) await this.onUnitChanged(CONFIG.VEHICULO_ID);
@@ -1309,7 +1251,6 @@ class AdminManager {
             }
         });
 
-        // Formularios administrativos y de demos
         this._bindForms();
     }
 
@@ -1322,6 +1263,39 @@ class AdminManager {
     }
 
     _bindForms() {
+        // 0. Formulario de Inicio de Sesión Real (sin contraseñas en código)
+        const formLogin = document.getElementById('form-auth-login');
+        if (formLogin) {
+            formLogin.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('auth-login-email').value.trim();
+                const password = document.getElementById('auth-login-password').value;
+                if (!email || !password) return;
+                try {
+                    await this.iniciarSesionConCredenciales(email, password);
+                    formLogin.reset();
+                } catch (err) {
+                    ui.playSound('cancel');
+                    ui.showFeedback(err.message || 'Credenciales inválidas', 'danger', 3500);
+                }
+            });
+        }
+
+        // 0.b Formulario de Acceso Invitado Temporal
+        const formGuest = document.getElementById('form-auth-guest');
+        if (formGuest) {
+            formGuest.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const nombreVis = document.getElementById('guest-login-name')?.value?.trim() || 'Visitante Showroom';
+                try {
+                    await this.iniciarSesionInvitadoReal(nombreVis);
+                } catch (err) {
+                    ui.playSound('cancel');
+                    ui.showFeedback(err.message || 'No se pudo iniciar la sesión de exhibición', 'danger', 3800);
+                }
+            });
+        }
+
         // 1. Alta de Modelo Comercial
         const formModelo = document.getElementById('form-admin-modelo');
         if (formModelo) {
@@ -1333,27 +1307,25 @@ class AdminManager {
                 const brazo = document.getElementById('mod-form-brazo').checked;
                 if (!codigo || !nombre) return;
 
-                const nuevo = {
-                    id_modelo: this.state.modelos.length + 1,
-                    codigo_modelo: codigo,
-                    nombre,
-                    descripcion: 'Modelo comercial registrado desde Administración',
-                    microcontrolador_default: micro,
-                    tiene_brazo: brazo,
-                    tiene_motores_giro: true,
-                    activo: true
-                };
-                try { await api.crearModeloComercial(nuevo); } catch (_) {}
-                this.state.modelos.push(nuevo);
-                this._saveState();
-                this.registrarEventoAuditoria('ALTA_MODELO', 'modelos_catalogo', nuevo.id_modelo, `Modelo comercial '${nombre}' (${codigo}) creado.`);
-                formModelo.reset();
-                this.renderizarTodo();
-                ui.showFeedback(`Modelo comercial ${codigo} registrado`, 'success');
+                try {
+                    await api.crearModeloComercial({
+                        codigo_modelo: codigo,
+                        nombre,
+                        descripcion: 'Modelo comercial registrado desde Administración',
+                        microcontrolador_default: micro,
+                        tiene_brazo: brazo,
+                        tiene_motores_giro: true
+                    });
+                    formModelo.reset();
+                    await this.sincronizarDesdeRds();
+                    ui.showFeedback(`Modelo comercial ${codigo} registrado en RDS`, 'success');
+                } catch (err) {
+                    ui.showFeedback(`Error al registrar modelo: ${err.message}`, 'danger');
+                }
             });
         }
 
-        // 2. Alta de Unidad Física (se guarda en la tabla `vehiculos` de RDS vía POST /api/vehiculos/)
+        // 2. Alta de Unidad Física en RDS
         const formUnidad = document.getElementById('form-admin-unidad');
         if (formUnidad) {
             formUnidad.addEventListener('submit', async (e) => {
@@ -1366,32 +1338,25 @@ class AdminManager {
                 if (!nombre || !serie) return;
 
                 try {
-                    const creada = await api.crearVehiculoBase({
+                    await api.crearUnidadAdmin({
                         nombre,
-                        modelo: modeloObj.nombre,
-                        descripcion: `Serie: ${serie} · Estado: ${estadoCom}`,
-                        microcontrolador: modeloObj.microcontrolador_default || 'ESP8266'
-                    });
-                    const idNuevo = creada?.id_vehiculo || (this.obtenerTodasLasUnidadesEnriquecidas().length + 1);
-                    this.state.metaUnidades[idNuevo] = {
                         id_modelo: idModelo,
+                        modelo: modeloObj.nombre,
                         numero_serie: serie,
-                        estado_comercial: estadoCom,
-                        id_propietario: null,
-                        soporte_autorizado: false
-                    };
-                    this._saveState();
-                    this.registrarEventoAuditoria('ALTA_UNIDAD_RDS', 'vehiculos', idNuevo, `Unidad física '${nombre}' (${serie}) persistida en Amazon RDS.`);
+                        descripcion: `Serie: ${serie} · Estado: ${estadoCom}`,
+                        microcontrolador: modeloObj.microcontrolador_default || 'ESP8266',
+                        estado_comercial: estadoCom
+                    });
                     formUnidad.reset();
                     await this.sincronizarDesdeRds();
-                    ui.showFeedback(`Unidad '${nombre}' registrada en Amazon RDS`, 'success');
+                    ui.showFeedback(`Unidad '${nombre}' (${serie}) registrada en Amazon RDS`, 'success');
                 } catch (err) {
                     ui.showFeedback(`Error al registrar unidad: ${err.message}`, 'danger');
                 }
             });
         }
 
-        // 3. Alta de Cliente Comprador
+        // 3. Alta de Cliente Comprador en RDS
         const formCliente = document.getElementById('form-admin-cliente');
         if (formCliente) {
             formCliente.addEventListener('submit', async (e) => {
@@ -1399,48 +1364,37 @@ class AdminManager {
                 const nombre = document.getElementById('cli-form-nombre').value.trim();
                 const email = document.getElementById('cli-form-email').value.trim().toLowerCase();
                 const password = document.getElementById('cli-form-pass').value;
-                if (!nombre || !email) return;
+                if (!nombre || !email || !password) return;
 
-                const nuevoId = Math.max(3, ...this.state.clientes.map(c => Number(c.id_usuario))) + 1;
-                const nuevoCli = { id_usuario: nuevoId, nombre, email, rol: 'USUARIO', activo: true };
-                try { await api.registrarCliente({ nombre, email, password }); } catch (_) {}
-                this.state.clientes.push(nuevoCli);
-                this._saveState();
-                this.registrarEventoAuditoria('ALTA_CLIENTE', 'usuarios', nuevoId, `Cliente comprador '${nombre}' (${email}) dado de alta.`);
-                formCliente.reset();
-                this.renderizarTodo();
-                ui.showFeedback(`Cliente ${nombre} registrado`, 'success');
+                try {
+                    await api.registrarCliente({ nombre, email, password });
+                    formCliente.reset();
+                    await this.sincronizarDesdeRds();
+                    ui.showFeedback(`Cliente ${nombre} registrado en RDS`, 'success');
+                } catch (err) {
+                    ui.showFeedback(`Error al registrar cliente: ${err.message}`, 'danger');
+                }
             });
         }
 
-        // 4. Asignación de Unidad Física a Cliente Comprador
+        // 4. Asignación de Unidad Física a Cliente Comprador en RDS
         const formAsig = document.getElementById('form-admin-asignacion');
         if (formAsig) {
             formAsig.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const idVehiculo = Number(document.getElementById('asig-form-vehiculo').value);
                 const idUsuario = Number(document.getElementById('asig-form-cliente').value);
-                const cliente = this.state.clientes.find(c => Number(c.id_usuario) === idUsuario);
-
-                if (!this.state.metaUnidades[idVehiculo]) this.state.metaUnidades[idVehiculo] = {};
-                this.state.metaUnidades[idVehiculo].id_propietario = idUsuario;
-                this.state.metaUnidades[idVehiculo].estado_comercial = 'VENDIDO';
-                this.state.metaUnidades[idVehiculo].soporte_autorizado = false;
-                this._saveState();
-
-                try { await api.asignarUnidad({ id_vehiculo: idVehiculo, id_usuario: idUsuario }); } catch (_) {}
-                this.registrarEventoAuditoria(
-                    'ASIGNACION_COMPRADOR',
-                    'asignaciones_vehiculo',
-                    idVehiculo,
-                    `Unidad #${idVehiculo} asignada en propiedad a ${cliente?.nombre || idUsuario} (Estado -> VENDIDO).`
-                );
-                this.renderizarTodo();
-                ui.showFeedback(`Unidad #${idVehiculo} asignada a ${cliente?.nombre}`, 'success');
+                try {
+                    await api.asignarUnidad({ id_vehiculo: idVehiculo, id_usuario: idUsuario });
+                    await this.sincronizarDesdeRds();
+                    ui.showFeedback(`Unidad #${idVehiculo} asignada en RDS`, 'success');
+                } catch (err) {
+                    ui.showFeedback(`Error al asignar unidad: ${err.message}`, 'danger');
+                }
             });
         }
 
-        // 5. Crear nueva Secuencia DEMO en RDS (Empresa o Privada)
+        // 5. Crear nueva Secuencia DEMO en RDS
         const formDemo = document.getElementById('form-editor-nueva-demo');
         if (formDemo) {
             formDemo.addEventListener('submit', async (e) => {
@@ -1453,24 +1407,11 @@ class AdminManager {
                     const creada = await api.crearDemo({
                         id_vehiculo: CONFIG.VEHICULO_ID,
                         nombre,
-                        descripcion: desc || `Creada por ${this.sesion.nombre}`
+                        descripcion: desc || `Creada por ${this.sesion?.nombre || 'Usuario'}`
                     });
-                    const idNueva = creada?.id_demo;
-                    if (idNueva) {
-                        const tipo = this.sesion.rol === 'ADMIN' ? 'EMPRESA' : 'PRIVADA';
-                        this.state.metaDemos[idNueva] = {
-                            tipo_demo: tipo,
-                            id_usuario_creador: this.sesion.id_usuario
-                        };
-                        this._saveState();
-                        this.idDemoSeleccionada = idNueva;
+                    if (creada?.id_demo) {
+                        this.idDemoSeleccionada = creada.id_demo;
                     }
-                    this.registrarEventoAuditoria(
-                        'CREAR_DEMO_RDS',
-                        'demos',
-                        idNueva || 0,
-                        `Secuencia DEMO '${nombre}' (${this.sesion.rol === 'ADMIN' ? 'EMPRESA' : 'PRIVADA'}) guardada en Amazon RDS.`
-                    );
                     formDemo.reset();
                     await this.cargarDemosParaEditor(CONFIG.VEHICULO_ID);
                     if (this.onUnitChanged) await this.onUnitChanged(CONFIG.VEHICULO_ID);

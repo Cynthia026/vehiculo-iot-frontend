@@ -1,6 +1,6 @@
 // assets/js/api.js
-import { CONFIG } from './config.js?v=13';
-import { ui } from './ui.js?v=13';
+import { CONFIG } from './config.js?v=15';
+import { ui } from './ui.js?v=15';
 
 class ApiClient {
     constructor() {
@@ -125,16 +125,26 @@ class ApiClient {
         });
         if (!response.ok) {
             const msg = await this._parseError(response);
-            throw new Error(msg);
+            const err = new Error(msg);
+            err.status = response.status;
+            throw err;
         }
         return await response.json();
     }
 
     async cancelarDemo(idVehiculo = CONFIG.VEHICULO_ID) {
-        return await fetch(`${CONFIG.API_BASE_URL}/api/demos/vehiculo/${idVehiculo}/cancelar`, {
+        const url = `${CONFIG.API_BASE_URL}/api/demos/vehiculo/${idVehiculo}/cancelar`;
+        const response = await fetch(url, {
             method: 'POST',
             headers: this._headers()
         });
+        if (!response.ok) {
+            const msg = await this._parseError(response);
+            const err = new Error(msg);
+            err.status = response.status;
+            throw err;
+        }
+        return await response.json();
     }
 
     // --- MÉTODOS DE MONITOREO (Práctica 4.2) ---
@@ -162,6 +172,10 @@ class ApiClient {
             nombre_visitante: nombreVisitante,
             id_vehiculo: idVehiculo
         });
+    }
+
+    async obtenerPerfilActual() {
+        return this.get('/api/auth/me');
     }
 
     async logout() {
@@ -252,6 +266,10 @@ class ApiClient {
 
     async obtenerCatalogoPublico() {
         return this.get('/api/exhibicion/catalogo');
+    }
+
+    async consultarAuditoria(limit = 30) {
+        return this.get(`/api/admin/auditoria?limit=${limit}`);
     }
 }
 

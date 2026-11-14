@@ -910,14 +910,16 @@ button:focus-visible, select:focus-visible, .joystick-zone:focus-visible {
 }
 
 /* ===== Práctica 4.3: Módulo de Administración, Roles y Editor de Demos ===== */
+html:has(body[data-view="admin"]),
 body[data-view="admin"] {
     height: auto !important;
-    min-height: 100dvh;
+    min-height: 100dvh !important;
     overflow-y: auto !important;
 }
 body[data-view="admin"] .app-main {
     overflow: visible !important;
     height: auto !important;
+    flex: 1 0 auto !important;
 }
 
 .header-unit-select {

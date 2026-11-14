@@ -1,6 +1,6 @@
 // assets/js/websocket.js
-import { CONFIG } from './config.js?v=13';
-import { ui } from './ui.js?v=13';
+import { CONFIG } from './config.js?v=15';
+import { ui } from './ui.js?v=15';
 
 class WebSocketManager {
     constructor() {
@@ -27,6 +27,14 @@ class WebSocketManager {
                 console.log('WSS Conectado a unidad #' + CONFIG.VEHICULO_ID);
                 ui.updateWssStatus('En línea', 'success');
                 this.reconnectAttempts = 0;
+
+                // Autenticar el canal enviando el token dentro del frame del WebSocket (no en la URL)
+                if (CONFIG.AUTH_TOKEN && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        tipo_evento: 'auth_ws',
+                        token: CONFIG.AUTH_TOKEN
+                    }));
+                }
             };
 
             this.ws.onmessage = (event) => {
@@ -34,7 +42,6 @@ class WebSocketManager {
                     const data = JSON.parse(event.data);
                     console.log('Evento WSS recibido:', data);
                     
-                    // Si app.js está escuchando, le pasamos el JSON
                     if (this.onMessage) {
                         this.onMessage(data);
                     }

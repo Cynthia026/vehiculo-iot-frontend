@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Control, Monitoreo y Administración IoT - Vehículos</title>
 
-    <link rel="icon" type="image/png" href="assets/Favicon_Iot_vehiculo.png?v=13">
-    <link rel="apple-touch-icon" href="assets/Favicon_Iot_vehiculo.png?v=13">
+    <link rel="icon" type="image/png" href="assets/Favicon_Iot_vehiculo.png?v=15">
+    <link rel="apple-touch-icon" href="assets/Favicon_Iot_vehiculo.png?v=15">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-    <link rel="stylesheet" href="assets/css/styles.css?v=13">
+    <link rel="stylesheet" href="assets/css/styles.css?v=15">
 </head>
 <body data-view="control">
 
@@ -66,8 +66,8 @@
         </nav>
 
         <div class="status-group" id="status-panel">
-            <button type="button" id="btn-role-switcher" class="badge status-badge role-header-btn" title="Rol activo (Clic para cambiar perfil en Administración)">
-                <i class="bi bi-person-badge"></i> <span id="header-role-text">USUARIO: Cynthia</span>
+            <button type="button" id="btn-role-switcher" class="badge status-badge role-header-btn" title="Estado de sesión (Clic para ir a Administración)">
+                <i class="bi bi-person-badge"></i> <span id="header-role-text">Iniciar Sesión</span>
             </button>
             <div id="status-wss" class="badge bg-secondary status-badge" title="Estado del WebSocket">
                 <i class="bi bi-broadcast"></i> WSS: Desconectado
@@ -202,47 +202,89 @@
         <!-- ================= VISTA ADMINISTRACIÓN (Práctica 4.3) ================= -->
         <div id="vista-admin" class="vista-admin d-none">
 
-            <!-- Barra Superior: Selector de Rol / Sesión y Pruebas de Seguridad RBAC / BOLA -->
-            <section class="panel admin-session-panel" aria-label="Control de sesión y roles">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                    <div>
-                        <h2 class="panel-title mb-0"><i class="bi bi-person-check-fill"></i> Control de Acceso Basado en Roles (RBAC) y Propiedad de Recurso</h2>
-                        <small class="text-secondary">Alterna entre los 3 roles del modelo comercial para operar y auditar permisos en vivo.</small>
+            <!-- Panel de Autenticación JWT y Control de Acceso Basado en Roles (RBAC) -->
+            <section class="panel admin-session-panel" aria-label="Autenticación y Control de Acceso">
+                <div id="admin-auth-login-box">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <h2 class="panel-title mb-0"><i class="bi bi-shield-lock-fill"></i> Autenticación de Plataforma Comercial IoT (JWT + RDS)</h2>
+                            <small class="text-secondary">Inicia sesión con tu cuenta en Amazon RDS o solicita una reserva temporal como Invitado.</small>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-fill-email="admin@vehiculoiot.com" title="Autocompletar correo de Administrador">
+                                <i class="bi bi-building-gear"></i> Correo Admin
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-fill-email="cynthia@cliente.com" title="Autocompletar correo de Compradora A">
+                                <i class="bi bi-person-badge"></i> Correo Cynthia
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" data-fill-email="carlos@cliente.com" title="Autocompletar correo de Comprador B">
+                                <i class="bi bi-person-lock"></i> Correo Carlos
+                            </button>
+                        </div>
                     </div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-sm admin-role-btn" data-switch-profile="ADMIN">
-                            <i class="bi bi-building-gear"></i> Administrador (Empresa)
-                        </button>
-                        <button type="button" class="btn btn-sm admin-role-btn active" data-switch-profile="USUARIO_A">
-                            <i class="bi bi-person-badge"></i> Usuario A (Cynthia · Unidad #1)
-                        </button>
-                        <button type="button" class="btn btn-sm admin-role-btn" data-switch-profile="USUARIO_B">
-                            <i class="bi bi-person-lock"></i> Usuario B (Carlos · Unidad #3)
-                        </button>
-                        <button type="button" class="btn btn-sm admin-role-btn" data-switch-profile="INVITADO">
-                            <i class="bi bi-clock-history"></i> Invitado (Demo 3 min)
-                        </button>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-7">
+                            <form id="form-auth-login" class="admin-inline-form h-100">
+                                <h3 class="h6 fw-bold mb-2"><i class="bi bi-key-fill text-info"></i> Iniciar Sesión (Administrador / Cliente Comprador)</h3>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-sm-5">
+                                        <label for="auth-login-email" class="form-label small text-secondary mb-1">Correo electrónico</label>
+                                        <input type="email" id="auth-login-email" class="form-control form-control-sm admin-input" placeholder="usuario@correo.com" autocomplete="username" required>
+                                    </div>
+                                    <div class="col-12 col-sm-4">
+                                        <label for="auth-login-password" class="form-label small text-secondary mb-1">Contraseña</label>
+                                        <input type="password" id="auth-login-password" class="form-control form-control-sm admin-input" placeholder="Ingresa tu contraseña" autocomplete="current-password" required>
+                                    </div>
+                                    <div class="col-12 col-sm-3 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">
+                                            <i class="bi bi-box-arrow-in-right"></i> Entrar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="col-12 col-lg-5">
+                            <form id="form-auth-guest" class="admin-inline-form h-100">
+                                <h3 class="h6 fw-bold mb-2"><i class="bi bi-stopwatch text-success"></i> Acceso Temporal para Invitado (Showroom 3 min)</h3>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-sm-7">
+                                        <label for="guest-login-name" class="form-label small text-secondary mb-1">Tu nombre (Prospecto)</label>
+                                        <input type="text" id="guest-login-name" class="form-control form-control-sm admin-input" placeholder="Ej. Visitante Showroom" value="Visitante Showroom" required>
+                                    </div>
+                                    <div class="col-12 col-sm-5 d-grid">
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-play-circle-fill"></i> Probar Exhibición
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
 
-                <div id="admin-current-session-banner" class="admin-session-banner"></div>
+                <!-- Banner de sesión activa cuando ya hay un JWT válido -->
+                <div id="admin-auth-logged-box" class="d-none">
+                    <div id="admin-current-session-banner" class="admin-session-banner"></div>
 
-                <!-- Verificador rápido de casos negativos de seguridad exigidos por la rúbrica -->
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top border-secondary border-opacity-25">
-                    <span class="small text-secondary"><i class="bi bi-shield-shaded text-warning"></i> <strong>Pruebas de Autorización y Casos Negativos (403):</strong></span>
-                    <div class="d-flex flex-wrap gap-1">
-                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-bola-cruzado">
-                            Probar BOLA: Usuario A → Unidad Ajena
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-admin-sin-soporte">
-                            Probar Admin → Unidad Vendida sin Soporte
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-invitado-unidad-vendida">
-                            Probar Invitado → Unidad de Comprador
-                        </button>
+                    <!-- Verificador de autorización contra el Backend FastAPI -->
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2 pt-2 border-top border-secondary border-opacity-25">
+                        <span class="small text-secondary"><i class="bi bi-shield-shaded text-warning"></i> <strong>Verificar Permisos en Servidor FastAPI (Casos Negativos 403):</strong></span>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-bola-cruzado">
+                                Probar BOLA: Operar Unidad Ajena
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-admin-sin-soporte">
+                                Probar Admin → Unidad #1 Vendida
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" data-action="test-invitado-unidad-vendida">
+                                Probar Invitado → Unidad #1 Vendida
+                            </button>
+                        </div>
                     </div>
+                    <div id="security-test-output" class="security-test-output d-none mt-2"></div>
                 </div>
-                <div id="security-test-output" class="security-test-output d-none mt-2"></div>
             </section>
 
             <!-- ================= SECCIÓN ROL: ADMINISTRADOR (EMPRESA) ================= -->
@@ -358,7 +400,6 @@
                                         <th>Cliente Comprador</th>
                                         <th>Correo</th>
                                         <th>Unidades Asignadas</th>
-                                        <th>Vista Previa</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tabla-admin-clientes"></tbody>
@@ -372,7 +413,7 @@
                                     <input type="text" id="cli-form-nombre" class="form-control form-control-sm admin-input mb-2" placeholder="Nombre completo" required>
                                     <div class="d-flex gap-2">
                                         <input type="email" id="cli-form-email" class="form-control form-control-sm admin-input" placeholder="correo@cliente.com" required>
-                                        <input type="password" id="cli-form-pass" class="form-control form-control-sm admin-input" value="Cliente123*" required>
+                                        <input type="password" id="cli-form-pass" class="form-control form-control-sm admin-input" placeholder="Contraseña (mín. 6)" minlength="6" required>
                                         <button type="submit" class="btn btn-sm btn-info text-dark fw-bold">Alta</button>
                                     </div>
                                 </form>
@@ -392,7 +433,7 @@
 
                     <!-- Bitácora de Auditoría -->
                     <section class="panel">
-                        <h2 class="panel-title"><i class="bi bi-journal-check"></i> Bitácora de Auditoría y Seguridad</h2>
+                        <h2 class="panel-title"><i class="bi bi-journal-check"></i> Bitácora de Auditoría y Seguridad (RDS)</h2>
                         <div class="admin-table-wrap">
                             <table class="monitor-table">
                                 <thead>
@@ -411,7 +452,7 @@
             </div>
 
             <!-- ================= SECCIÓN ROL: USUARIO COMPRADOR ================= -->
-            <div id="admin-role-section-usuario" class="admin-role-section">
+            <div id="admin-role-section-usuario" class="admin-role-section d-none">
                 <section class="panel">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                         <div>
@@ -424,8 +465,8 @@
                 </section>
             </div>
 
-            <!-- ================= SECCIÓN ROL: INVITADO (SHOWROOM TEMPORAL) ================= -->
-            <div id="admin-role-section-invitado" class="admin-role-section d-none">
+            <!-- ================= SECCIÓN ROL: INVITADO / CATÁLOGO PÚBLICO ================= -->
+            <div id="admin-role-section-invitado" class="admin-role-section">
                 <section class="panel mb-3">
                     <h2 class="panel-title"><i class="bi bi-stopwatch-fill"></i> Sesión Temporal de Demostración (Unidad de Exhibición)</h2>
                     <div id="invitado-reserva-status" class="admin-session-banner mb-3"></div>
@@ -436,10 +477,10 @@
             </div>
 
             <!-- ================= EDITOR DE SECUENCIAS DEMO Y PASOS ORDENADOS (ADMIN + USUARIO) ================= -->
-            <section class="panel" id="panel-editor-demos" aria-label="Editor de secuencias DEMO">
+            <section class="panel d-none" id="panel-editor-demos" aria-label="Editor de secuencias DEMO">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
-                        <h2 class="panel-title mb-0"><i class="bi bi-Sliders2-vertical"></i> <i class="bi bi-list-ol"></i> Editor de Secuencias DEMO y Pasos Ordenados (Amazon RDS)</h2>
+                        <h2 class="panel-title mb-0"><i class="bi bi-list-ol"></i> Editor de Secuencias DEMO y Pasos Ordenados (Amazon RDS)</h2>
                         <small class="text-secondary">Crea rutinas, agrega movimientos compatibles, define duración (100–10,000 ms), reordena pasos y ejecútalos con prioridad de DETENER.</small>
                     </div>
                     <span class="badge monitor-rds-pill"><i class="bi bi-database-check"></i> Persistido en RDS</span>
@@ -519,6 +560,6 @@
         Desarrollado por Cynthia Martínez García &middot; 2026 &middot; Control, Monitoreo y Administración IoT
     </footer>
 
-    <script type="module" src="assets/js/app.js?v=13"></script>
+    <script type="module" src="assets/js/app.js?v=15"></script>
 </body>
 </html>

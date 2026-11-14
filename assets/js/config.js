@@ -10,12 +10,12 @@ export const CONFIG = {
     setVehiculoId(id) {
         const num = Number(id) || 1;
         this.VEHICULO_ID = num;
+        // Seguridad: El token JWT NUNCA se concatena en la URL del WebSocket para no exponerlo en logs del servidor
         const baseWs = 'wss://api-vehiculo-iot.duckdns.org/api/demos/ws/' + num;
-        this.WS_BASE_URL = this.AUTH_TOKEN ? `${baseWs}?token=${encodeURIComponent(this.AUTH_TOKEN)}` : baseWs;
-        this.WS_URL = this.WS_BASE_URL;
+        this.WS_BASE_URL = baseWs;
+        this.WS_URL = baseWs;
     },
     setAuthToken(token) {
         this.AUTH_TOKEN = token || null;
-        this.setVehiculoId(this.VEHICULO_ID);
     }
 };

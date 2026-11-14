@@ -1,10 +1,10 @@
 // assets/js/app.js
-import { api } from './api.js?v=13';
-import { wsManager } from './websocket.js?v=13';
-import { ui, normalizar } from './ui.js?v=13';
-import { Joystick } from './joystick.js?v=13';
-import { CONFIG } from './config.js?v=13';
-import { adminManager } from './admin.js?v=13';
+import { api } from './api.js?v=15';
+import { wsManager } from './websocket.js?v=15';
+import { ui, normalizar } from './ui.js?v=15';
+import { Joystick } from './joystick.js?v=15';
+import { CONFIG } from './config.js?v=15';
+import { adminManager } from './admin.js?v=15';
 
 let catalogoComandos = [];
 let idComandoDetener = null;
@@ -37,7 +37,7 @@ async function inicializar() {
         configurarControles();
 
         // 2. Inicializar módulo de Administración (Práctica 4.3: RBAC, inventario, demos y sesiones)
-        adminManager.init({
+        await adminManager.init({
             onUnitChanged: async (idVehiculoRds) => {
                 wsManager.reconnectForVehicle(idVehiculoRds);
                 await cargarCatalogos();
